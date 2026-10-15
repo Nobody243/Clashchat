@@ -14,7 +14,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="ClashChat – sharpen your arguments in live debates against an AI opponent. Casual, ranked and coached modes.">
-  <meta name="theme-color" content="#121113">
+  <meta name="theme-color" content="#0D0B12">
   <meta name="color-scheme" content="dark light">
 
   <!-- iOS meta tags & icons -->
@@ -27,20 +27,17 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <!-- Preconnect so the app's fonts arrive before the first frame -->
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
   <title>ClashChat – AI Debate Arena</title>
   <link rel="manifest" href="manifest.json">
 
   <style>
     /* Branded loading state shown until Flutter paints its first frame. */
-    html, body { height: 100%; margin: 0; background: #121113; }
+    html, body { height: 100%; margin: 0; background: #0D0B12; }
     #cc-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 18px;
-      background: #121113; color: #F2EFEA;
-      font-family: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #0D0B12; color: #F5F1EA;
+      font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
       transition: opacity 320ms ease-out; z-index: 9999;
     }
     #cc-loader.hide { opacity: 0; pointer-events: none; }
@@ -48,13 +45,13 @@
     #cc-loader .mark .b1, #cc-loader .mark .b2 {
       position: absolute; border-radius: 10px;
     }
-    #cc-loader .mark .b1 { left: 6px; top: 10px; width: 30px; height: 22px; border: 3px solid #F2EFEA; }
-    #cc-loader .mark .b2 { left: 22px; top: 24px; width: 28px; height: 20px; background: #D4A84B;
-      box-shadow: 0 0 0 3px #121113; }
+    #cc-loader .mark .b1 { left: 6px; top: 10px; width: 30px; height: 22px; border: 3px solid #F5F1EA; }
+    #cc-loader .mark .b2 { left: 22px; top: 24px; width: 28px; height: 20px; background: #F0B94B;
+      box-shadow: 0 0 0 3px #0D0B12; }
     #cc-loader .word { font-size: 24px; font-weight: 600; letter-spacing: -0.4px; }
-    #cc-loader .word span { color: #D4A84B; }
-    #cc-loader .bar { width: 64px; height: 2px; background: #2A272B; overflow: hidden; border-radius: 2px; }
-    #cc-loader .bar i { display: block; height: 100%; width: 40%; background: #D4A84B;
+    #cc-loader .word span { color: #F0B94B; }
+    #cc-loader .bar { width: 64px; height: 2px; background: #2C2736; overflow: hidden; border-radius: 2px; }
+    #cc-loader .bar i { display: block; height: 100%; width: 40%; background: #F0B94B;
       animation: cc-slide 1.2s ease-in-out infinite; }
     @keyframes cc-slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(260%);} }
     @media (prefers-reduced-motion: reduce) { #cc-loader .bar i { animation: none; width: 100%; } }

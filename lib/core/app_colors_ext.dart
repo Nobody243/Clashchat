@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
+import 'app_typography.dart';
 
 /// Theme-aware semantic colors. See DESIGN.md §2.
 ///
@@ -97,27 +97,27 @@ class AppColorsExt extends ThemeExtension<AppColorsExt> {
     surface: AppColors.surfaceDark,
     surfaceRaised: AppColors.surfaceRaisedDark,
     inset: AppColors.insetDark,
-    textPrimary: Color(0xFFF2EFEA),
-    textSecondary: Color(0xFFA39E99),
-    textHint: Color(0xFF7A756F),
-    border: Color(0xFF2A272B),
-    borderStrong: Color(0xFF3A363C),
-    shadow: Color(0x66000000),
-    accent: AppColors.brass,
-    onAccent: Color(0xFF1A1409),
-    accentSoft: Color(0x1FD4A84B),
-    ctaBg: AppColors.brass,
-    ctaFg: Color(0xFF1A1409),
-    positiveBg: Color(0xFF15302A),
+    textPrimary: Color(0xFFF5F1EA),
+    textSecondary: Color(0xFFB8B1AA),
+    textHint: Color(0xFF857E88),
+    border: Color(0xFF2C2736),
+    borderStrong: Color(0xFF3E3749),
+    shadow: Color(0x80000000),
+    accent: AppColors.gold,
+    onAccent: Color(0xFF1C1406),
+    accentSoft: Color(0x29F0B94B),
+    ctaBg: AppColors.gold,
+    ctaFg: Color(0xFF1C1406),
+    positiveBg: Color(0xFF123A2E),
     positiveText: AppColors.sage,
-    negativeBg: Color(0xFF3A1E1A),
-    negativeText: AppColors.terracotta,
-    warningBg: Color(0xFF3A2C12),
+    negativeBg: Color(0xFF432119),
+    negativeText: AppColors.ember,
+    warningBg: Color(0xFF3F2E10),
     warningText: AppColors.amber,
-    infoBg: Color(0xFF182637),
+    infoBg: Color(0xFF172A47),
     infoText: AppColors.sky,
-    rankBg: Color(0xFF2E2715),
-    rankText: AppColors.brassLight,
+    rankBg: Color(0xFF352A12),
+    rankText: Color(0xFFF5CE7A),
   );
 
   static const AppColorsExt light = AppColorsExt(
@@ -126,26 +126,26 @@ class AppColorsExt extends ThemeExtension<AppColorsExt> {
     surfaceRaised: AppColors.surfaceLight,
     inset: AppColors.insetLight,
     textPrimary: AppColors.ink,
-    textSecondary: Color(0xFF605B58),
-    textHint: Color(0xFF7A7570),
-    border: Color(0xFFE6E1D9),
-    borderStrong: Color(0xFFD3CCC1),
-    shadow: Color(0x141A1719),
-    accent: AppColors.brassDeep,
+    textSecondary: Color(0xFF5B5566),
+    textHint: Color(0xFF7A7484),
+    border: Color(0xFFE3DDD2),
+    borderStrong: Color(0xFFCFC7BA),
+    shadow: Color(0x1A171320),
+    accent: AppColors.goldDeep,
     onAccent: Colors.white,
-    accentSoft: Color(0x1A9A7520),
+    accentSoft: Color(0x24B47F1E),
     ctaBg: AppColors.ink,
     ctaFg: AppColors.paper,
-    positiveBg: Color(0xFFE3F2EA),
-    positiveText: Color(0xFF256B4D),
-    negativeBg: Color(0xFFFBE7E1),
-    negativeText: Color(0xFFA8482F),
-    warningBg: Color(0xFFFBF0D9),
-    warningText: Color(0xFF8A5E10),
-    infoBg: Color(0xFFE4ECF7),
-    infoText: Color(0xFF355F9A),
-    rankBg: Color(0xFFF7EDD6),
-    rankText: Color(0xFF7D5E14),
+    positiveBg: Color(0xFFDDF3E8),
+    positiveText: Color(0xFF1F7A55),
+    negativeBg: Color(0xFFFBE3DD),
+    negativeText: Color(0xFFB8442B),
+    warningBg: Color(0xFFFBEFD5),
+    warningText: Color(0xFF946011),
+    infoBg: Color(0xFFE1EAF9),
+    infoText: Color(0xFF2F62B5),
+    rankBg: Color(0xFFF7EAC9),
+    rankText: Color(0xFF7A5A10),
   );
 
   @override
@@ -265,12 +265,11 @@ extension AppThemeContext on BuildContext {
     Color? color,
     double? height,
   }) {
-    return GoogleFonts.jetBrainsMono(
-      fontSize: size,
-      fontWeight: weight,
+    return AppTypography.mono(
+      size: size,
+      weight: weight,
       color: color ?? colors.textPrimary,
-      height: height ?? 1.1,
-      letterSpacing: -0.5,
-    ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+      height: height,
+    );
   }
 }

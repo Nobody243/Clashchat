@@ -22,7 +22,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  static const _total = Duration(milliseconds: 3400);
+  static const _total = Duration(milliseconds: 3200);
   static const _word = 'ClashChat';
 
   late final AnimationController _ctrl;
@@ -30,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen>
   // Timeline (fractions of _total).
   late final Animation<double> _bubbles = CurvedAnimation(
     parent: _ctrl,
-    curve: const Interval(0.04, 0.38, curve: Curves.easeOutBack),
+    curve: const Interval(0.04, 0.40, curve: Curves.easeOutQuart),
   );
   late final Animation<double> _impact = CurvedAnimation(
     parent: _ctrl,
@@ -59,13 +59,17 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: _total);
     _ctrl.addStatusListener(_onStatus);
+    // Start shortly after the first paint so shader warm-up and the
+    // HTML-to-Flutter hand-off never eat the opening of the animation.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (context.reduceMotion) {
         _ctrl.value = 1;
-      } else {
-        _ctrl.forward();
+        return;
       }
+      Future.delayed(const Duration(milliseconds: 160), () {
+        if (mounted) _ctrl.forward();
+      });
     });
   }
 
@@ -289,7 +293,7 @@ class _ClashMarkPainter extends CustomPainter {
       const Radius.circular(18),
     );
 
-    canvas.saveLayer(const Rect.fromLTWH(-200, -200, 560, 560), Paint());
+    canvas.saveLayer(const Rect.fromLTWH(-160, -40, 480, 240), Paint());
     canvas.drawRRect(
       back,
       Paint()

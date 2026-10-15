@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../core/app_colors.dart';
 import '../core/app_colors_ext.dart';
 
 /// Atmospheric page background: canvas color, two or three slow "stage
@@ -77,9 +78,10 @@ class _AppBackdropState extends State<AppBackdrop>
               painter: _StageLightPainter(
                 t: _ctrl.value,
                 lights: [
-                  _Light(c.accent, 0.11 * k, const Offset(0.15, -0.05), 0.55),
-                  _Light(c.infoText, 0.06 * k, const Offset(0.95, 0.35), 0.45),
-                  _Light(c.negativeText, 0.045 * k, const Offset(0.35, 1.05), 0.5),
+                  _Light(c.accent, 0.22 * k, const Offset(0.12, -0.08), 0.62),
+                  _Light(AppColors.violet, 0.16 * k, const Offset(1.02, 0.30), 0.55),
+                  _Light(AppColors.ember, 0.10 * k, const Offset(0.30, 1.08), 0.50),
+                  _Light(c.infoText, 0.07 * k, const Offset(0.85, 0.95), 0.40),
                 ],
               ),
             ),
@@ -90,7 +92,7 @@ class _AppBackdropState extends State<AppBackdrop>
               child: CustomPaint(
                 painter: _GrainPainter(
                   color: dark ? Colors.white : Colors.black,
-                  alpha: dark ? 0.045 : 0.035,
+                  alpha: dark ? 0.05 : 0.035,
                 ),
               ),
             ),

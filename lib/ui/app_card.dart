@@ -69,6 +69,16 @@ class AppCard extends StatelessWidget {
             : Matrix4.identity(),
         decoration: BoxDecoration(
           color: bg,
+          // Top-light: a few percent brighter at the top edge gives the
+          // surface a lit, dimensional feel without a visible gradient.
+          gradient: context.isDark
+              ? LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color.lerp(bg, Colors.white, 0.055)!, bg],
+                  stops: const [0.0, 0.55],
+                )
+              : null,
           borderRadius: r,
           border: border,
           boxShadow: context.isDark
