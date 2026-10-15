@@ -1,99 +1,80 @@
 import 'package:flutter/material.dart';
-import '../services/timer_service.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../services/timer_service.dart';
+import '../ui/ui.dart';
+
+/// Pill-shaped countdown. Under 60 s the digits turn terracotta and pulse
+/// gently; while paused the clock becomes a pause glyph. Tap (when [onTap] is
+/// given) toggles pause / resume.
 class DebateTimerWidget extends StatelessWidget {
   final DebateTimerService timerService;
+  final VoidCallback? onTap;
 
-  const DebateTimerWidget({super.key, required this.timerService});
+  const DebateTimerWidget({
+    super.key,
+    required this.timerService,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: timerService,
       builder: (context, _) {
-        final isLow = timerService.remainingSeconds <= 30 && timerService.remainingSeconds > 0;
+        final c = context.colors;
+        final remaining = timerService.remainingSeconds;
+        final isLow = remaining > 0 && remaining < 60;
+        final isPaused = !timerService.isRunning && remaining > 0;
+        final fg = isLow ? c.negativeText : c.textPrimary;
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        Widget content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPaused ? AppIcons.pause : AppIcons.timer,
+              size: 16,
+              color: fg,
+            ),
+            const SizedBox(width: AppSpacing.xs + 2),
+            Text(
+              timerService.formattedTime,
+              style: context.mono(size: 14, color: fg),
+            ),
+          ],
+        );
+
+        if (isLow && !isPaused && !context.reduceMotion) {
+          content = content
+              .animate(onPlay: (ctrl) => ctrl.repeat(reverse: true))
+              .fade(
+                begin: 1.0,
+                end: 0.6,
+                duration: 900.ms,
+                curve: Curves.easeInOut,
+              );
+        }
+
+        final pill = Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           decoration: BoxDecoration(
-            color: timerService.timerColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: timerService.timerColor),
+            color: c.surfaceRaised,
+            borderRadius: AppRadius.pillAll,
+            border: Border.all(color: c.border),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isLow ? Icons.timer_off : Icons.timer,
-                color: timerService.timerColor,
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              // Pulse animation when low
-              isLow
-                  ? _PulsingText(
-                      text: timerService.formattedTime,
-                      color: timerService.timerColor,
-                    )
-                  : Text(
-                      timerService.formattedTime,
-                      style: TextStyle(
-                        color: timerService.timerColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-            ],
-          ),
+          alignment: Alignment.center,
+          child: content,
+        );
+
+        if (onTap == null) return pill;
+        return Pressable(
+          onTap: onTap,
+          pressedScale: 0.96,
+          semanticLabel: isPaused ? 'Resume timer' : 'Pause timer',
+          child: pill,
         );
       },
     );
-  }
-}
-
-class _PulsingText extends StatefulWidget {
-  final String text;
-  final Color color;
-  const _PulsingText({required this.text, required this.color});
-
-  @override
-  State<_PulsingText> createState() => _PulsingTextState();
-}
-
-class _PulsingTextState extends State<_PulsingText>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..repeat(reverse: true);
-    _anim = Tween(begin: 0.4, end: 1.0).animate(_ctrl);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _anim,
-      child: Text(
-        widget.text,
-        style: TextStyle(
-          color: widget.color,
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
   }
 }

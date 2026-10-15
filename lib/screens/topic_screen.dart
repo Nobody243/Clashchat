@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
+
 import '../core/responsive_layout.dart';
-import '../widgets/desktop_page_shell.dart';
+import '../models/debate_mode.dart';
+import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
 import 'stance_screen.dart';
-import '../models/debate_mode.dart';
 
 class TopicScreen extends StatefulWidget {
   final DebateMode mode;
@@ -19,56 +16,36 @@ class TopicScreen extends StatefulWidget {
 }
 
 class _TopicScreenState extends State<TopicScreen> {
-  static final _categories = [
-    {
-      'icon': Icons.computer_rounded,
-      'label': 'Technology',
-      'color': const Color(0xFF4A90E2),
-    },
-    {
-      'icon': Icons.school_rounded,
-      'label': 'Education',
-      'color': const Color(0xFF7B4FA6),
-    },
-    {
-      'icon': Icons.public_rounded,
-      'label': 'Society',
-      'color': const Color(0xFF38A169),
-    },
-    {
-      'icon': Icons.favorite_rounded,
-      'label': 'Health',
-      'color': const Color(0xFFE8927C),
-    },
-    {
-      'icon': Icons.account_balance_rounded,
-      'label': 'Politics',
-      'color': const Color(0xFFC49A3C),
-    },
-    {
-      'icon': Icons.eco_rounded,
-      'label': 'Environment',
-      'color': const Color(0xFF48BB78),
-    },
-    {
-      'icon': Icons.trending_up_rounded,
-      'label': 'Economy',
-      'color': const Color(0xFF3D7DD8),
-    },
-    {
-      'icon': Icons.theater_comedy_rounded,
-      'label': 'Culture',
-      'color': const Color(0xFF9B59B6),
-    },
+  static const List<({String label, IconData icon})> _categories = [
+    (label: 'Technology', icon: AppIcons.technology),
+    (label: 'Education', icon: AppIcons.education),
+    (label: 'Society', icon: AppIcons.society),
+    (label: 'Health', icon: AppIcons.health),
+    (label: 'Politics', icon: AppIcons.politics),
+    (label: 'Environment', icon: AppIcons.environment),
+    (label: 'Economy', icon: AppIcons.economy),
+    (label: 'Culture', icon: AppIcons.culture),
   ];
 
   String? _selectedCategory;
   final _customTopicCtrl = TextEditingController();
 
+  bool get _canContinue =>
+      _selectedCategory != null || _customTopicCtrl.text.trim().isNotEmpty;
+
   @override
   void dispose() {
     _customTopicCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleCategory(String label) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      final wasSelected = _selectedCategory == label;
+      _selectedCategory = wasSelected ? null : label;
+      if (!wasSelected) _customTopicCtrl.clear();
+    });
   }
 
   void _nextStep() {
@@ -78,12 +55,8 @@ class _TopicScreenState extends State<TopicScreen> {
 
     if (topic == null || topic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Please select a category or enter a custom topic.',
-            style: GoogleFonts.poppins(),
-          ),
-          backgroundColor: AppColors.error,
+        const SnackBar(
+          content: Text('Pick a category or write your own topic.'),
         ),
       );
       return;
@@ -92,12 +65,8 @@ class _TopicScreenState extends State<TopicScreen> {
     // Check if topic contains at least one letter
     if (!RegExp(r'[a-zA-Z]').hasMatch(topic)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Topic must contain at least one letter.',
-            style: GoogleFonts.poppins(),
-          ),
-          backgroundColor: AppColors.error,
+        const SnackBar(
+          content: Text('A topic needs at least one letter.'),
         ),
       );
       return;
@@ -113,354 +82,40 @@ class _TopicScreenState extends State<TopicScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final textPrimary = AppColors.textPrimary(isDark);
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
-    final isWideDesktop = screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+    final isDesktop =
+        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
 
-    // Desktop: Two-column layout
-    if (isDesktop) {
-      if (isWideDesktop) {
-        return Scaffold(
-          body: DesktopPageShell(
-            maxWidth: 1200,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left Column: Topic Selection
-                Expanded(
-                  flex: 2,
-                  child: _buildTopicSelectionPanel(isDark, textPrimary, true),
-                ),
-                const SizedBox(width: 32),
-                // Right Column: Instructions
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDeep : AppColors.surfaceDeepLight,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border(isDark)),
-                    ),
-                    child: _buildInstructionsPanel(isDark, textPrimary, true),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      return Scaffold(
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left Column: Topic Selection
-                Expanded(
-                  flex: 2,
-                  child: _buildTopicSelectionPanel(isDark, textPrimary, false),
-                ),
-                // Right Column: Instructions
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDeep : AppColors.surfaceDeepLight,
-                      border: Border(
-                        left: BorderSide(
-                          color: isDark ? const Color(0x1AFFFFFF) : AppColors.border(isDark),
-                        ),
-                      ),
-                    ),
-                    child: _buildInstructionsPanel(isDark, textPrimary, false),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Mobile: Single column layout
     return Scaffold(
-      appBar: AppBar(title: const Text('Pick a Topic')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choose a Category',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: _categories.map((cat) {
-                    final isSelected = _selectedCategory == cat['label'];
-                    final catColor = cat['color'] as Color;
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() {
-                          _selectedCategory = isSelected
-                              ? null
-                              : cat['label'] as String;
-                          if (!isSelected) _customTopicCtrl.clear();
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected ? catColor : AppColors.surf(isDark),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: isSelected ? catColor : AppColors.border(isDark),
-                            width: 1.5,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: catColor.withValues(alpha: 0.4),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              cat['icon'] as IconData,
-                              size: 14,
-                              color: isSelected ? Colors.white : catColor,
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              cat['label'] as String,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected ? Colors.white : textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 36),
-                Text(
-                  'Or Enter a Custom Topic',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _customTopicCtrl,
-                  style: TextStyle(color: textPrimary),
-                  onChanged: (_) => setState(() => _selectedCategory = null),
-                  decoration: const InputDecoration(
-                    labelText: 'e.g. "AI will replace doctors"',
-                    prefixIcon: Icon(Icons.edit_note_rounded),
-                  ),
-                ),
-                const SizedBox(height: 48),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: _nextStep,
-                    child: Text(
-                      'Next Step',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      appBar: AppBar(
+        leading: const SetupBackButton(),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: isDesktop ? _buildDesktop() : _buildColumn(columns: 2),
       ),
     );
   }
 
-  Widget _buildTopicSelectionPanel(bool isDark, Color textPrimary, bool isWideDesktop) {
-    return Padding(
-      padding: isWideDesktop
-          ? EdgeInsets.zero
-          : const EdgeInsets.fromLTRB(48, 48, 48, 48),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildDesktop() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SetupBackButton(),
-            const SizedBox(height: 24),
-            // Header
-            Text(
-              'Choose Your Topic',
-              style: GoogleFonts.poppins(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: textPrimary,
+            Flexible(
+              flex: 5,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: _buildColumn(columns: 4),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Select a category or enter a custom debate topic',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: AppColors.textSecondary(isDark),
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Categories
-            Text(
-              'Categories',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat['label'];
-                final catColor = cat['color'] as Color;
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() {
-                      _selectedCategory = isSelected
-                          ? null
-                          : cat['label'] as String;
-                      if (!isSelected) _customTopicCtrl.clear();
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected ? catColor : AppColors.surf(isDark),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: isSelected ? catColor : AppColors.border(isDark),
-                        width: 1.5,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: catColor.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          cat['icon'] as IconData,
-                          size: 18,
-                          color: isSelected ? Colors.white : catColor,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          cat['label'] as String,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected ? Colors.white : textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 40),
-            // Custom Topic
-            Text(
-              'Custom Topic',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _customTopicCtrl,
-              style: TextStyle(color: textPrimary),
-              onChanged: (_) => setState(() => _selectedCategory = null),
-              decoration: InputDecoration(
-                labelText: 'e.g. "AI will replace doctors"',
-                prefixIcon: const Icon(Icons.edit_note_rounded),
-                filled: true,
-                fillColor: AppColors.surf(isDark),
-              ),
-            ),
-            const SizedBox(height: 40),
-            // Next Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                onPressed: _nextStep,
-                child: Text(
-                  'Continue to Stance',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+            const SizedBox(width: AppSpacing.xxxl),
+            Flexible(
+              flex: 3,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: const _HowItWorksPanel(),
               ),
             ),
           ],
@@ -469,125 +124,213 @@ class _TopicScreenState extends State<TopicScreen> {
     );
   }
 
-  Widget _buildInstructionsPanel(bool isDark, Color textPrimary, bool isWideDesktop) {
-    return Padding(
-      padding: isWideDesktop
-          ? const EdgeInsets.all(24)
-          : const EdgeInsets.fromLTRB(32, 48, 32, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'How It Works',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: textPrimary,
+  /// The single setup column: header, grid, custom field, bottom CTA.
+  Widget _buildColumn({required int columns}) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gutter,
+              AppSpacing.sm,
+              AppSpacing.gutter,
+              AppSpacing.xxl,
+            ),
+            child: StaggeredColumn(
+              children: [
+                const AppOverline('Step 1 of 3'),
+                const SizedBox(height: AppSpacing.sm),
+                Text('Pick a topic', style: context.text.headlineMedium),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Choose a category or write the motion you want to argue.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _buildGrid(columns),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppSectionHeader(title: 'Or write your own'),
+                AppTextField(
+                  controller: _customTopicCtrl,
+                  hint: 'e.g. Remote work makes teams more productive',
+                  prefixIcon: AppIcons.topic,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (_) => setState(() => _selectedCategory = null),
+                  onSubmitted: (_) {
+                    if (_canContinue) _nextStep();
+                  },
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          _InstructionStep(
-            step: '1',
-            title: 'Choose Topic',
-            description: 'Select a category or enter your own debate topic.',
-            icon: Icons.topic_rounded,
-            isDark: isDark,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.md,
+            AppSpacing.gutter,
+            AppSpacing.gutter,
           ),
-          const SizedBox(height: 20),
-          _InstructionStep(
-            step: '2',
-            title: 'Pick Stance',
-            description: 'Decide whether you\'re for or against the topic.',
-            icon: Icons.thumbs_up_down_rounded,
-            isDark: isDark,
+          child: AppButton.primary(
+            label: 'Continue',
+            trailingIcon: AppIcons.forward,
+            onPressed: _canContinue ? _nextStep : null,
           ),
-          const SizedBox(height: 20),
-          _InstructionStep(
-            step: '3',
-            title: 'Debate',
-            description: 'Challenge ClashBot with your arguments and see how you score!',
-            icon: Icons.chat_bubble_rounded,
-            isDark: isDark,
-          ),
-        ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGrid(int columns) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        mainAxisSpacing: AppSpacing.md,
+        crossAxisSpacing: AppSpacing.md,
+        mainAxisExtent: 112,
+      ),
+      itemCount: _categories.length,
+      itemBuilder: (context, i) {
+        final cat = _categories[i];
+        return _CategoryCard(
+          label: cat.label,
+          icon: cat.icon,
+          selected: _selectedCategory == cat.label,
+          onTap: () => _toggleCategory(cat.label),
+        );
+      },
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryCard({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Semantics(
+      selected: selected,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        borderColor: selected ? c.accent : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppIconTile(
+              icon: icon,
+              size: 40,
+              iconSize: 20,
+              color: selected ? c.accent : c.textSecondary,
+              background: selected ? c.accentSoft : c.surfaceRaised,
+            ),
+            const Spacer(),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: context.text.titleSmall,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _InstructionStep extends StatelessWidget {
-  final String step;
+/// Desktop side panel: the three steps of the setup flow.
+class _HowItWorksPanel extends StatelessWidget {
+  const _HowItWorksPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
+      child: AppReveal(
+        index: 3,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppOverline('How it works'),
+            const SizedBox(height: AppSpacing.md),
+            const AppListGroup(
+              children: [
+                _StepRow(
+                  icon: AppIcons.topic,
+                  title: 'Pick a topic',
+                  description: 'Choose a category or write your own motion.',
+                ),
+                _StepRow(
+                  icon: AppIcons.stanceFor,
+                  title: 'Choose your side',
+                  description: 'Argue for or against the motion.',
+                ),
+                _StepRow(
+                  icon: AppIcons.ai,
+                  title: 'Debate ClashBot',
+                  description: 'Make your case, then see how you scored.',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StepRow extends StatelessWidget {
+  final IconData icon;
   final String title;
   final String description;
-  final IconData icon;
-  final bool isDark;
 
-  const _InstructionStep({
-    required this.step,
+  const _StepRow({
+    required this.icon,
     required this.title,
     required this.description,
-    required this.icon,
-    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              step,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconTile(icon: icon, size: 40, iconSize: 20),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: context.text.titleSmall),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(description, style: context.text.bodySmall),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    icon,
-                    size: 16,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary(isDark),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary(isDark),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

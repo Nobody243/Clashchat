@@ -81,6 +81,30 @@ class AuthService {
   }
 
   // Logout
+  /// Sends a Firebase password-reset email. Returns null on success or a
+  /// user-readable error message.
+  static Future<String?> sendPasswordReset(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return 'Enter your email first.';
+    try {
+      await _auth.sendPasswordResetEmail(email: trimmed);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'invalid-email':
+          return 'That email address is not valid.';
+        case 'user-not-found':
+          // Don't reveal whether an account exists.
+          return null;
+        default:
+          return 'Could not send the reset email. Please try again.';
+      }
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+      return 'Could not send the reset email. Please try again.';
+    }
+  }
+
   static Future<void> logout() async {
     await _auth.signOut();
   }
@@ -162,23 +186,29 @@ class AuthService {
       final email = user.email ?? '';
 
       final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final profileData = <String, dynamic>{
-        'displayName': displayName,
-        'email': email,
-        'avatarSeed': displayName,
-        'isGoogleSignIn': true,
-        'bio': '',
-        'role': 'Member',
-        'rankPoints': 0,
-        'dailyUsageLimit': UsageQuotaService.defaultDailyLimit,
-        'dailyUsageUsed': 0,
-        'dailyUsageDayKey': UsageQuotaService.todayKey(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+      final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
 
-      if (userCredential.additionalUserInfo?.isNewUser ?? false) {
-        profileData['createdAt'] = FieldValue.serverTimestamp();
-      }
+      // Only a brand-new account gets the full default profile. A returning user
+      // must NOT have rankPoints, quota, bio, or avatar reset on every login.
+      final Map<String, dynamic> profileData = isNewUser
+          ? <String, dynamic>{
+              'displayName': displayName,
+              'email': email,
+              'avatarSeed': displayName,
+              'isGoogleSignIn': true,
+              'bio': '',
+              'role': 'Member',
+              'rankPoints': 0,
+              'dailyUsageLimit': UsageQuotaService.defaultDailyLimit,
+              'dailyUsageUsed': 0,
+              'dailyUsageDayKey': UsageQuotaService.todayKey(),
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            }
+          : <String, dynamic>{
+              'lastLoginAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
 
       await Future.wait([
         user.updateDisplayName(displayName).catchError((e) {

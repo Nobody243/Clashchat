@@ -1,21 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import '../core/responsive_layout.dart';
+import '../models/debate_mode.dart';
+import '../models/rank_model.dart';
+import '../services/auth_service.dart';
+import '../services/usage_quota_service.dart';
+import '../ui/ui.dart';
+import '../widgets/user_avatar.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'topic_screen.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
-import '../core/responsive_layout.dart';
-import '../widgets/user_avatar.dart';
-import '../services/auth_service.dart';
-import '../services/usage_quota_service.dart';
-import '../models/rank_model.dart';
-import '../models/debate_mode.dart';
-import '../widgets/desktop_page_shell.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,188 +20,73 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   int _navIndex = 0;
-
-  late AnimationController _fabAnimCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _fabAnimCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _fabAnimCtrl.dispose();
-    super.dispose();
-  }
 
   void _onNavTap(int i) {
     if (i == _navIndex) return;
-    _fabAnimCtrl.reverse().then((_) {
-      setState(() => _navIndex = i);
-      _fabAnimCtrl.forward();
-    });
+    setState(() => _navIndex = i);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Use responsive layout for widths > 850px
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     if (screenWidth > ResponsiveLayout.desktopBreakpoint) {
       return ResponsiveLayout(
         currentIndex: _navIndex,
         onNavigationChanged: _onNavTap,
-        screens: [
-          const _HomeBody(),
-          const HistoryScreen(),
-          const ProfileScreen(),
-          const SettingsScreen(),
+        screens: const [
+          _HomeBody(),
+          HistoryScreen(),
+          ProfileScreen(),
+          SettingsScreen(),
         ],
       );
     }
-    
-    // Mobile layout
-    final isDark = context.watch<ThemeProvider>().isDark;
+
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 350),
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position:
-                Tween<Offset>(
-                  begin: const Offset(0.05, 0),
-                  end: Offset.zero,
-                ).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-            child: child,
-          ),
-        ),
-        child: switch (_navIndex) {
-          1 => const HistoryScreen(),
-          2 => const ProfileScreen(),
-          3 => const SettingsScreen(),
-          _ => const _HomeBody(),
-        },
-      ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surface : AppColors.surfaceLight,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: NavigationBar(
-          selectedIndex: _navIndex,
-          onDestinationSelected: _onNavTap,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.history_outlined),
-              selectedIcon: Icon(Icons.history_rounded),
-              label: 'History',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
-          ],
-        ),
+      body: switch (_navIndex) {
+        1 => const HistoryScreen(),
+        2 => const ProfileScreen(),
+        3 => const SettingsScreen(),
+        _ => const _HomeBody(),
+      },
+      bottomNavigationBar: AppBottomNav(
+        currentIndex: _navIndex,
+        onChanged: _onNavTap,
       ),
     );
   }
 }
 
-class _HomeBody extends StatefulWidget {
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
+class _HomeBody extends StatelessWidget {
   const _HomeBody();
 
-  @override
-  State<_HomeBody> createState() => _HomeBodyState();
-}
-
-class _HomeBodyState extends State<_HomeBody>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _staggerCtrl;
-  late List<Animation<double>> _staggerAnims;
-
-  @override
-  void initState() {
-    super.initState();
-    _staggerCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _staggerAnims = List.generate(6, (i) {
-      final start = i * 0.15;
-      final end = (start + 0.55).clamp(0.0, 1.0);
-      return CurvedAnimation(
-        parent: _staggerCtrl,
-        curve: Interval(start, end, curve: Curves.easeOutCubic),
-      );
-    });
-    _staggerCtrl.forward();
+  static String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
-  @override
-  void dispose() {
-    _staggerCtrl.dispose();
-    super.dispose();
-  }
-
-  Widget _animated(int index, Widget child) {
-    final anim = _staggerAnims[index.clamp(0, _staggerAnims.length - 1)];
-    return FadeTransition(
-      opacity: anim,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.2),
-          end: Offset.zero,
-        ).animate(anim),
-        child: child,
-      ),
+  void _open(BuildContext context, DebateMode mode) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TopicScreen(mode: mode)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
+    final c = context.colors;
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-              ? [AppColors.background, AppColors.surface]
-              : [AppColors.backgroundLight, AppColors.surfaceDeepLight],
-        ),
-      ),
+    return ColoredBox(
+      color: c.background,
       child: SafeArea(
         top: !isDesktop,
         child: StreamBuilder<DocumentSnapshot>(
@@ -214,392 +95,109 @@ class _HomeBodyState extends State<_HomeBody>
               .doc(AuthService.currentUser?.uid)
               .snapshots(),
           builder: (context, snapshot) {
+            final loading =
+                snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData;
+
             final data = snapshot.data?.data() as Map<String, dynamic>?;
             final firestoreDisplayName = data?['displayName'] as String?;
             final authDisplayName = AuthService.currentUser?.displayName;
             final displayName =
                 firestoreDisplayName ?? authDisplayName ?? 'Debater';
             final avatarSeed = data?['avatarSeed'] as String? ?? 'Felix';
-            final points = data?['rankPoints'] ?? 0;
+            final points = (data?['rankPoints'] as num?)?.toInt() ?? 0;
+            final rank = RankModel.getRankFromPoints(points);
+            final rankColor = Color(RankModel.rankData[rank]!['color'] as int);
             final quota = UsageQuotaService.fromData(data);
-            final isQuotaLocked = quota.isLocked;
+            final locked = quota.isLocked;
 
-            final isWideDesktop = screenWidth >= 1024.0;
+            final header = _Header(
+              greeting: _greeting(),
+              displayName: displayName,
+              avatarSeed: avatarSeed,
+              rankColor: rankColor,
+            );
+            final rankCard = _RankCard(points: points);
+            final usageCard = _UsageCard(quota: quota);
+            final modes = _ModesGroup(
+              locked: locked,
+              onOpen: (mode) => _open(context, mode),
+            );
 
-            // Wide Desktop: Row layouts for cards and modes
-            if (isWideDesktop) {
-              return DesktopPageShell(
-                maxWidth: 1300,
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _animated(
-                                0,
-                                _HeroCard(
-                                  displayName: displayName,
-                                  avatarSeed: avatarSeed,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _animated(
-                                1,
-                                RankBadgeWidget(points: points),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _animated(
-                                2,
-                                _UsageCard(quota: quota),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
-                        Text(
-                          'Game Modes',
-                          style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary(isDark),
-                          ),
-                        ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1, duration: 400.ms),
-                        const SizedBox(height: 16),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _animated(
-                                3,
-                                _ModeCard(
-                                  title: 'Casual Mode',
-                                  subtitle:
-                                      isQuotaLocked
-                                          ? 'Daily usage exhausted. Come back tomorrow for a fresh quota.'
-                                          : 'Practice with custom timers & difficulties. No points at risk.',
-                                  icon: Icons.coffee,
-                                  textalignment: TextAlign.left,
-                                  color: Colors.blue,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const TopicScreen(mode: DebateMode.casual),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _animated(
-                                4,
-                                _ModeCard(
-                                  title: 'Ranked Mode',
-                                  subtitle:
-                                      isQuotaLocked
-                                          ? 'Daily usage exhausted. Your next debate unlocks after reset.'
-                                          : '10 min fixed timer. Difficulty matches your rank. Win points to rank up!',
-                                  icon: Icons.emoji_events,
-                                  textalignment: TextAlign.left,
-                                  color: Colors.amber,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const TopicScreen(mode: DebateMode.ranked),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              child: _animated(
-                                5,
-                                _ModeCard(
-                                  title: 'Learning Mode',
-                                  subtitle:
-                                      isQuotaLocked
-                                          ? 'Daily usage exhausted. Learning mode will reopen after reset.'
-                                          : 'Learn the art of debate. Get real-time feedback, tips, and logical coaching.',
-                                  icon: Icons.school_rounded,
-                                  textalignment: TextAlign.left,
-                                  color: const Color(0xFF0F6E56),
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const TopicScreen(mode: DebateMode.learning),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-            // Desktop: Two-column layout
             if (isDesktop) {
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left Column: Hero card, Rank, Usage
-                        Expanded(
-                          flex: 1,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _animated(
-                                  0,
-                                  _HeroCard(
-                                    displayName: displayName,
-                                    avatarSeed: avatarSeed,
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xxxl,
+                  vertical: AppSpacing.xxxl,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 960),
+                    child: loading
+                        ? const _DesktopSkeleton()
+                        : StaggeredColumn(
+                            children: [
+                              header,
+                              AppSpacing.vXxl,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 5,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        rankCard,
+                                        AppSpacing.vLg,
+                                        usageCard,
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 24),
-                                _animated(
-                                  1,
-                                  RankBadgeWidget(points: points),
-                                ),
-                                const SizedBox(height: 16),
-                                _animated(
-                                  2,
-                                  _UsageCard(quota: quota),
-                                ),
-                              ],
-                            ),
+                                  const SizedBox(width: AppSpacing.xxl),
+                                  Expanded(
+                                    flex: 6,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        const AppSectionHeader(
+                                          title: 'Start a debate',
+                                        ),
+                                        modes,
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 32),
-                        // Right Column: Game Modes Grid
-                        Expanded(
-                          flex: 1,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  'Game Modes',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary(isDark),
-                                  ),
-                                ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1, duration: 400.ms),
-                                const SizedBox(height: 16),
-                                _animated(
-                                  3,
-                                  _ModeCard(
-                                    title: 'Casual Mode',
-                                    subtitle:
-                                        isQuotaLocked
-                                            ? 'Daily usage exhausted. Come back tomorrow for a fresh quota.'
-                                            : 'Practice with custom timers & difficulties. No points at risk.',
-                                    icon: Icons.coffee,
-                                    textalignment: TextAlign.left,
-                                    color: Colors.blue,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const TopicScreen(mode: DebateMode.casual),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _animated(
-                                  4,
-                                  _ModeCard(
-                                    title: 'Ranked Mode',
-                                    subtitle:
-                                        isQuotaLocked
-                                            ? 'Daily usage exhausted. Your next debate unlocks after reset.'
-                                            : '10 min fixed timer. Difficulty matches your rank. Win points to rank up!',
-                                    icon: Icons.emoji_events,
-                                    textalignment: TextAlign.left,
-                                    color: Colors.amber,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const TopicScreen(mode: DebateMode.ranked),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _animated(
-                                  5,
-                                  _ModeCard(
-                                    title: 'Learning Mode',
-                                    subtitle:
-                                        isQuotaLocked
-                                            ? 'Daily usage exhausted. Learning mode will reopen after reset.'
-                                            : 'Learn the art of debate. Get real-time feedback, tips, and logical coaching.',
-                                    icon: Icons.school_rounded,
-                                    textalignment: TextAlign.left,
-                                    color: const Color(0xFF0F6E56),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const TopicScreen(mode: DebateMode.learning),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               );
             }
 
-            // Mobile: Single column layout
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        0,
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                          child: _HeroCard(
-                            displayName: displayName,
-                            avatarSeed: avatarSeed,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        1,
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: RankBadgeWidget(points: points),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        2,
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _UsageCard(quota: quota),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        3,
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _ModeCard(
-                            title: 'Casual Mode',
-                            subtitle:
-                                isQuotaLocked
-                                    ? 'Daily usage exhausted. Come back tomorrow for a fresh quota.'
-                                    : 'Practice with custom timers & difficulties. No points at risk.',
-                            icon: Icons.coffee,
-                            textalignment: TextAlign.right,
-                            color: Colors.blue,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const TopicScreen(mode: DebateMode.casual),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        4,
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _ModeCard(
-                            title: 'Ranked Mode',
-                            subtitle:
-                                isQuotaLocked
-                                    ? 'Daily usage exhausted. Your next debate unlocks after reset.'
-                                    : '10 min fixed timer. Difficulty matches your rank. Win points to rank up!',
-                            icon: Icons.emoji_events,
-                            textalignment: TextAlign.right,
-                            color: Colors.amber,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const TopicScreen(mode: DebateMode.ranked),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                    SliverToBoxAdapter(
-                      child: _animated(
-                        5,
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: _ModeCard(
-                            title: 'Learning Mode',
-                            subtitle:
-                                isQuotaLocked
-                                    ? 'Daily usage exhausted. Learning mode will reopen after reset.'
-                                    : 'Learn the art of debate. Get real-time feedback, tips, and logical coaching.',
-                            icon: Icons.school_rounded,
-                            textalignment: TextAlign.right,
-                            color: const Color(0xFF0F6E56),
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const TopicScreen(mode: DebateMode.learning),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 40)),
-                  ],
-                ),
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                AppSpacing.xl,
+                AppSpacing.gutter,
+                AppSpacing.xxxl,
               ),
+              child: loading
+                  ? const _PhoneSkeleton()
+                  : StaggeredColumn(
+                      children: [
+                        header,
+                        AppSpacing.vXxl,
+                        rankCard,
+                        AppSpacing.vMd,
+                        usageCard,
+                        AppSpacing.vXxl,
+                        const AppSectionHeader(title: 'Start a debate'),
+                        modes,
+                      ],
+                    ),
             );
           },
         ),
@@ -608,6 +206,119 @@ class _HomeBodyState extends State<_HomeBody>
   }
 }
 
+// ── Header ───────────────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final String greeting;
+  final String displayName;
+  final String avatarSeed;
+  final Color rankColor;
+
+  const _Header({
+    required this.greeting,
+    required this.displayName,
+    required this.avatarSeed,
+    required this.rankColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppOverline(greeting),
+              AppSpacing.vXs,
+              Text(
+                displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.headlineSmall,
+              ),
+            ],
+          ),
+        ),
+        AppSpacing.hLg,
+        UserAvatar(seed: avatarSeed, size: 44, ringColor: rankColor),
+      ],
+    );
+  }
+}
+
+// ── Rank card ────────────────────────────────────────────────────────────────
+
+class _RankCard extends StatelessWidget {
+  final int points;
+
+  const _RankCard({required this.points});
+
+  String _nextRankLabel(DebateRank rank) {
+    final ranks = DebateRank.values;
+    final idx = ranks.indexOf(rank);
+    if (idx >= ranks.length - 1) return 'Top rank';
+    final next = RankModel.rankData[ranks[idx + 1]]!;
+    final remaining = (next['minPoints'] as int) - points;
+    return '$remaining pts to ${next['name']}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final rank = RankModel.getRankFromPoints(points);
+    final rankData = RankModel.rankData[rank]!;
+    final rankColor = Color(rankData['color'] as int);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppIconTile(
+                icon: AppIcons.forRank(rank),
+                color: rankColor,
+                background: rankColor.withValues(alpha: 0.12),
+                size: 52,
+                iconSize: 26,
+              ),
+              AppSpacing.hLg,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(rankData['name'] as String,
+                        style: context.text.titleSmall),
+                    AppSpacing.vXs,
+                    Text(
+                      '$points pts',
+                      style: context.mono(size: 22, color: c.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          AppSpacing.vLg,
+          AppProgressBar(
+            value: RankModel.getRankProgress(points),
+            color: rankColor,
+          ),
+          AppSpacing.vSm,
+          Text(
+            _nextRankLabel(rank),
+            style: context.text.labelSmall?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Usage card ───────────────────────────────────────────────────────────────
+
 class _UsageCard extends StatelessWidget {
   final UsageQuotaState quota;
 
@@ -615,189 +326,163 @@ class _UsageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isEmpty = quota.isLocked;
-    final color = isEmpty ? AppColors.error : AppColors.primary;
+    final c = context.colors;
+    final locked = quota.isLocked;
+    final barColor = locked ? c.negativeText : c.accent;
+    final numberStyle = context.mono(size: 14, color: c.textPrimary);
+    final wordStyle = context.text.bodySmall;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
+    return AppCard(
+      level: AppCardLevel.raised,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                isEmpty ? Icons.lock_rounded : Icons.local_fire_department_rounded,
-                color: color,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Daily usage',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: color,
+              const AppIconTile(icon: AppIcons.usage, size: 36, iconSize: 18),
+              AppSpacing.hMd,
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: '${quota.usedToday}', style: numberStyle),
+                      TextSpan(text: ' of ', style: wordStyle),
+                      TextSpan(text: '${quota.dailyLimit}', style: numberStyle),
+                      TextSpan(text: ' debates today', style: wordStyle),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
-              Text(
-                '${quota.usedToday}/${quota.dailyLimit}',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: color,
+              if (locked) ...[
+                AppSpacing.hSm,
+                const AppPill(
+                  label: 'Daily limit reached',
+                  tone: AppPillTone.warning,
                 ),
-              ),
+              ],
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: quota.progress,
-              minHeight: 8,
-              backgroundColor: color.withValues(alpha: 0.14),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            isEmpty
-                ? 'You have used all available uses for today.'
-                : '${quota.remainingToday} uses left today.',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary(context.watch<ThemeProvider>().isDark),
-            ),
-          ),
+          AppSpacing.vMd,
+          AppProgressBar(value: quota.progress, color: barColor),
         ],
       ),
     );
   }
 }
 
-class RankBadgeWidget extends StatelessWidget {
-  final int points;
-  const RankBadgeWidget({super.key, required this.points});
+// ── Modes ────────────────────────────────────────────────────────────────────
+
+class _ModesGroup extends StatelessWidget {
+  final bool locked;
+  final ValueChanged<DebateMode> onOpen;
+
+  const _ModesGroup({required this.locked, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
-    final rank = RankModel.getRankFromPoints(points);
-    final rankData = RankModel.rankData[rank]!;
-    final progress = RankModel.getRankProgress(points);
-    final color = Color(rankData['color'] as int);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Text(
-            rankData['emoji'] as String,
-            style: const TextStyle(fontSize: 40),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rankData['name'] as String,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$points Points',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: Colors.grey.withValues(alpha: 0.3),
-                    valueColor: AlwaysStoppedAnimation(color),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final c = context.colors;
+    return AppListGroup(
+      children: [
+        _ModeRow(
+          mode: DebateMode.casual,
+          title: 'Casual',
+          subtitle: 'Custom timers and difficulty, no points at risk',
+          color: c.positiveText,
+          background: c.positiveBg,
+          locked: locked,
+          onTap: () => onOpen(DebateMode.casual),
+        ),
+        _ModeRow(
+          mode: DebateMode.ranked,
+          title: 'Ranked',
+          subtitle: '10 minutes, difficulty matched to your rank',
+          color: c.rankText,
+          background: c.rankBg,
+          locked: locked,
+          onTap: () => onOpen(DebateMode.ranked),
+        ),
+        _ModeRow(
+          mode: DebateMode.learning,
+          title: 'Learning',
+          subtitle: 'Real-time coaching, tips and feedback',
+          color: c.infoText,
+          background: c.infoBg,
+          locked: locked,
+          onTap: () => onOpen(DebateMode.learning),
+        ),
+      ],
     );
   }
 }
 
-class _ModeCard extends StatelessWidget {
-  final String title, subtitle;
-  final IconData icon;
+class _ModeRow extends StatelessWidget {
+  final DebateMode mode;
+  final String title;
+  final String subtitle;
   final Color color;
+  final Color background;
+  final bool locked;
   final VoidCallback onTap;
-  final TextAlign textalignment;
 
-  const _ModeCard({
+  const _ModeRow({
+    required this.mode,
     required this.title,
     required this.subtitle,
-    required this.icon,
     required this.color,
+    required this.background,
+    required this.locked,
     required this.onTap,
-    required this.textalignment,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
-        ),
+    final c = context.colors;
+    return Pressable(
+      onTap: locked ? null : onTap,
+      enabled: !locked,
+      semanticLabel: '$title mode',
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 32),
+            AppIconTile(
+              icon: AppIcons.forMode(mode, duotone: true),
+              color: locked ? c.textHint : color,
+              background: locked ? c.surfaceRaised : background,
+              size: 44,
+              iconSize: 24,
             ),
-            const SizedBox(width: 16),
+            AppSpacing.hMd,
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: color,
+                    style: context.text.titleSmall?.copyWith(
+                      color: locked ? c.textHint : c.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(fontSize: 12)),
+                  AppSpacing.vXs,
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.bodySmall?.copyWith(
+                      color: locked ? c.textHint : c.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: color),
+            AppSpacing.hSm,
+            if (locked)
+              const AppPill(label: 'Locked')
+            else
+              Icon(AppIcons.forward, size: 18, color: c.textHint),
           ],
         ),
       ),
@@ -805,129 +490,91 @@ class _ModeCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// Premium Hero Stats Card
-// ══════════════════════════════════════════════════════════
-class _HeroCard extends StatelessWidget {
-  final String displayName;
-  final String avatarSeed;
-  const _HeroCard({this.displayName = 'Debater', this.avatarSeed = 'Felix'});
+// ── Skeletons ────────────────────────────────────────────────────────────────
+
+class _HeaderSkeleton extends StatelessWidget {
+  const _HeaderSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [AppColors.primary, AppColors.surfaceDeep]
-              : [AppColors.primary, AppColors.gold],
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              AppSkeleton.line(width: 96, height: 11),
+              SizedBox(height: AppSpacing.sm),
+              AppSkeleton.line(width: 180, height: 24),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Decorative circles
-          Positioned(
-            top: -18,
-            right: -18,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.07),
+        const AppSkeleton.circle(size: 44),
+      ],
+    );
+  }
+}
+
+class _PhoneSkeleton extends StatelessWidget {
+  const _PhoneSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _HeaderSkeleton(),
+        AppSpacing.vXxl,
+        AppSkeleton.block(height: 148, radius: AppRadius.lgAll),
+        AppSpacing.vMd,
+        AppSkeleton.block(height: 92, radius: AppRadius.lgAll),
+        AppSpacing.vXxl,
+        const AppSkeleton.line(width: 120, height: 16),
+        AppSpacing.vMd,
+        AppSkeleton.block(height: 232, radius: AppRadius.lgAll),
+      ],
+    );
+  }
+}
+
+class _DesktopSkeleton extends StatelessWidget {
+  const _DesktopSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _HeaderSkeleton(),
+        AppSpacing.vXxl,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 5,
+              child: Column(
+                children: [
+                  AppSkeleton.block(height: 148, radius: AppRadius.lgAll),
+                  AppSpacing.vLg,
+                  AppSkeleton.block(height: 92, radius: AppRadius.lgAll),
+                ],
               ),
             ),
-          ),
-          Positioned(
-            bottom: -30,
-            right: 60,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+            const SizedBox(width: AppSpacing.xxl),
+            Expanded(
+              flex: 6,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppSkeleton.line(width: 120, height: 16),
+                  AppSpacing.vMd,
+                  AppSkeleton.block(height: 232, radius: AppRadius.lgAll),
+                ],
               ),
             ),
-          ),
-          // Content
-          Padding(
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                                'Welcome back,',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  color: Colors.white.withValues(alpha: 0.75),
-                                ),
-                              )
-                              .animate()
-                              .fadeIn(
-                                duration: 400.ms,
-                                curve: Curves.easeOutExpo,
-                              )
-                              .slideY(
-                                begin: 0.1,
-                                duration: 400.ms,
-                                curve: Curves.easeOutExpo,
-                              ),
-                          const SizedBox(height: 2),
-                          Text(
-                                displayName,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  letterSpacing: -0.5,
-                                ),
-                              )
-                              .animate(delay: 50.ms)
-                              .fadeIn(
-                                duration: 400.ms,
-                                curve: Curves.easeOutExpo,
-                              )
-                              .slideY(
-                                begin: 0.1,
-                                duration: 400.ms,
-                                curve: Curves.easeOutExpo,
-                              ),
-                        ],
-                      ),
-                    ),
-                    UserAvatar(seed: avatarSeed, size: 48)
-                        .animate(delay: 100.ms)
-                        .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                        .scaleXY(
-                          begin: 0.8,
-                          duration: 400.ms,
-                          curve: Curves.easeOutExpo,
-                        ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 }

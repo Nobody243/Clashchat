@@ -10,38 +10,33 @@ class RankModel {
   static const Map<DebateRank, Map<String, dynamic>> rankData = {
     DebateRank.newcomer: {
       'name': 'Newcomer',
-      'emoji': '🌱',
       'minPoints': 0,
       'maxPoints': 199,
-      'color': 0xFF78909C,  // grey
+      'color': 0xFF8E8A85,  // stone
     },
     DebateRank.challenger: {
       'name': 'Challenger',
-      'emoji': '⚔️',
       'minPoints': 200,
       'maxPoints': 499,
-      'color': 0xFF8D6E63,  // brown
+      'color': 0xFFB5793F,  // bronze
     },
     DebateRank.debater: {
       'name': 'Debater',
-      'emoji': '🎯',
       'minPoints': 500,
       'maxPoints': 999,
-      'color': 0xFF42A5F5,  // blue
+      'color': 0xFFA9B0BA,  // silver
     },
     DebateRank.orator: {
       'name': 'Orator',
-      'emoji': '🏛️',
       'minPoints': 1000,
       'maxPoints': 1999,
-      'color': 0xFFAB47BC,  // purple
+      'color': 0xFFD4A84B,  // brass
     },
     DebateRank.grandmaster: {
       'name': 'Grandmaster',
-      'emoji': '👑',
       'minPoints': 2000,
       'maxPoints': 999999,
-      'color': 0xFFFFD700,  // gold
+      'color': 0xFFCFE3F0,  // ice
     },
   };
 

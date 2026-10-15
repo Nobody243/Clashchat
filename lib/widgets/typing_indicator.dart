@@ -1,72 +1,63 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
-class TypingIndicator extends StatefulWidget {
+import '../ui/ui.dart';
+
+/// Three hint-coloured dots bouncing in sequence inside an AI-style bubble.
+class TypingIndicator extends StatelessWidget {
   const TypingIndicator({super.key});
 
   @override
-  State<TypingIndicator> createState() => _TypingIndicatorState();
-}
-
-class _TypingIndicatorState extends State<TypingIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
+    final c = context.colors;
+    final reduce = context.reduceMotion;
+
     return Align(
       alignment: Alignment.centerLeft,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Container(
+        margin: const EdgeInsets.only(
+          top: AppSpacing.md,
+          bottom: AppSpacing.xxs,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md + 2,
+        ),
         decoration: BoxDecoration(
-          color: AppColors.surf(isDark),
+          color: c.surfaceRaised,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
             bottomRight: Radius.circular(18),
-            bottomLeft: Radius.circular(4),
+            bottomLeft: Radius.circular(6),
           ),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          border: Border.all(color: c.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (i) {
-            return AnimatedBuilder(
-              animation: _ctrl,
-              builder: (context, child) {
-                final off = ((_ctrl.value - i * 0.2) % 1.0);
-                final t = off < 0.5 ? off * 2 : (1 - off) * 2;
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.4 + 0.6 * t),
-                    shape: BoxShape.circle,
-                  ),
-                  transform: Matrix4.translationValues(0, -4 * t, 0),
-                );
-              },
+            final dot = Container(
+              width: 6,
+              height: 6,
+              margin: EdgeInsets.only(right: i == 2 ? 0 : AppSpacing.xs + 1),
+              decoration: BoxDecoration(
+                color: c.textHint,
+                shape: BoxShape.circle,
+              ),
             );
+            if (reduce) return dot;
+            return dot
+                .animate(
+                  onPlay: (ctrl) => ctrl.repeat(reverse: true),
+                  delay: (i * 160).ms,
+                )
+                .moveY(
+                  begin: 0,
+                  end: -4,
+                  duration: 420.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(begin: 0.5, end: 1.0, duration: 420.ms);
           }),
         ),
       ),

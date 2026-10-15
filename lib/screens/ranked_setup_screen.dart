@@ -1,15 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
-import '../core/responsive_layout.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+
+import '../core/responsive_layout.dart';
+import '../models/debate_mode.dart';
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
-import 'chat_screen.dart';
-import '../models/debate_mode.dart';
+import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
+import 'chat_screen.dart';
 
 class RankedSetupScreen extends StatelessWidget {
   final String topic;
@@ -21,500 +19,456 @@ class RankedSetupScreen extends StatelessWidget {
     required this.stance,
   });
 
+  void _start(BuildContext context, String difficulty) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          topic: topic,
+          stance: stance,
+          difficulty: difficulty,
+          timerMinutes: 10, // always 10 in ranked
+          mode: DebateMode.ranked,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
+    final isDesktop =
+        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
 
-    // Desktop: Two-column layout
-    if (isDesktop) {
-      return Scaffold(
-        body: Row(
-          children: [
-            // Left Column: Match Info
-            Expanded(
-              flex: 2,
-              child: _buildMatchInfoPanel(isDark),
-            ),
-            // Right Column: Rank Preview & Points
-            Container(
-              width: 340,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDeep : AppColors.surfaceDeepLight,
-                border: Border(
-                  left: BorderSide(
-                    color: isDark ? const Color(0x1AFFFFFF) : AppColors.border(isDark),
-                  ),
-                ),
-              ),
-              child: _buildRankPreviewPanel(isDark),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Mobile layout
     return Scaffold(
-      appBar: AppBar(title: const Text('Ranked Match')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: StreamBuilder(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(AuthService.currentUser!.uid)
-                .snapshots(),
-            builder: (context, snapshot) {
-              final points = snapshot.data?.data()?['rankPoints'] ?? 0;
-              final rank = RankModel.getRankFromPoints(points);
-              final rankData = RankModel.rankData[rank]!;
-              final progress = RankModel.getRankProgress(points);
+      appBar: AppBar(
+        leading: const SetupBackButton(),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(AuthService.currentUser!.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final waiting =
+                snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData;
+            final points = snapshot.data?.data()?['rankPoints'] ?? 0;
+            final rank = RankModel.getRankFromPoints(points);
+            final rankData = RankModel.rankData[rank]!;
+            final rankName = rankData['name'] as String;
+            final rankColor = Color(rankData['color'] as int);
 
-              return Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
+            final column = _buildColumn(
+              context,
+              waiting: waiting,
+              rank: rank,
+              rankName: rankName,
+              rankColor: rankColor,
+            );
+
+            if (!isDesktop) return column;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Current rank display
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(rankData['color'] as int).withValues(alpha: 0.3),
-                            Color(rankData['color'] as int).withValues(alpha: 0.1),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Color(rankData['color'] as int).withValues(alpha: 0.5),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(rankData['emoji'] as String,
-                            style: const TextStyle(fontSize: 48)),
-                          const SizedBox(height: 8),
-                          Text(rankData['name'] as String,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(rankData['color'] as int),
-                            )),
-                          const SizedBox(height: 8),
-                          Text('$points Points',
-                            style: const TextStyle(fontSize: 16)),
-                          const SizedBox(height: 12),
-                          // Progress bar to next rank
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 8,
-                              backgroundColor: Colors.grey.withValues(alpha: 0.3),
-                              valueColor: AlwaysStoppedAnimation(
-                                Color(rankData['color'] as int)),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            rank == DebateRank.grandmaster
-                                ? 'Max Rank!'
-                                : '${(progress * 100).toInt()}% to next rank',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
+                    Flexible(
+                      flex: 5,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: column,
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Match info
-                    _InfoRow(icon: Icons.topic, label: 'Topic', value: topic),
-                    _InfoRow(icon: Icons.sports_mma, label: 'Stance', value: stance),
-                    _InfoRow(icon: Icons.timer, label: 'Timer', value: '10 minutes (fixed)'),
-                    _InfoRow(
-                      icon: Icons.psychology,
-                      label: 'AI Difficulty',
-                      value: '${rankData['emoji']} ${rankData['name']} level',
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Points preview
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text('Points at Stake',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _PointsPreview(label: 'Win (50+)', value: '+10 to +50', color: Colors.green),
-                              _PointsPreview(label: 'Loss (<50)', value: '-10 to -20', color: Colors.red),
-                            ],
-                          ),
-                        ],
+                    const SizedBox(width: AppSpacing.xxxl),
+                    Flexible(
+                      flex: 3,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 360),
+                        child: const _HowRankedWorksPanel(),
                       ),
                     ),
-
-                    const Spacer(),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          backgroundColor: Colors.amber,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              topic: topic,
-                              stance: stance,
-                              difficulty: rankData['name'] as String,
-                              timerMinutes: 10, // always 10 in ranked
-                              mode: DebateMode.ranked,
-                            ),
-                          ),
-                        ),
-                        child: const Text('Enter Ranked Match 🏆',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          )),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildMatchInfoPanel(bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(48, 80, 48, 48),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SetupBackButton(),
-            const SizedBox(height: 24),
-            Text(
-              'Ranked Match Setup',
-              style: GoogleFonts.poppins(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Review your match details before entering the debate',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: AppColors.textSecondary(isDark),
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Match Info Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surf(isDark),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border(isDark)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Match Details',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary(isDark),
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _InfoRow(icon: Icons.topic, label: 'Topic', value: topic, isDark: isDark),
-                  const SizedBox(height: 12),
-                  _InfoRow(icon: Icons.sports_mma, label: 'Stance', value: stance, isDark: isDark),
-                  const SizedBox(height: 12),
-                  _InfoRow(icon: Icons.timer, label: 'Timer', value: '10 minutes (fixed)', isDark: isDark),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildColumn(
+    BuildContext context, {
+    required bool waiting,
+    required DebateRank rank,
+    required String rankName,
+    required Color rankColor,
+  }) {
+    final c = context.colors;
+    final win = RankModel.calculatePointsEarned(100, true);
+    final loss = RankModel.calculatePointsEarned(0, true);
 
-  Widget _buildRankPreviewPanel(bool isDark) {
-    return StreamBuilder(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(AuthService.currentUser!.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final points = snapshot.data?.data()?['rankPoints'] ?? 0;
-        final rank = RankModel.getRankFromPoints(points);
-        final rankData = RankModel.rankData[rank]!;
-        final progress = RankModel.getRankProgress(points);
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Current Rank Display
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(rankData['color'] as int).withValues(alpha: 0.3),
-                      Color(rankData['color'] as int).withValues(alpha: 0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Color(rankData['color'] as int).withValues(alpha: 0.5),
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gutter,
+              AppSpacing.sm,
+              AppSpacing.gutter,
+              AppSpacing.xxl,
+            ),
+            child: StaggeredColumn(
+              children: [
+                const AppOverline('Step 3 of 3'),
+                const SizedBox(height: AppSpacing.sm),
+                Text('Ranked debate', style: context.text.headlineMedium),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'The terms are fixed. Your rank sets the opponent.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: c.textSecondary,
                   ),
                 ),
-                child: Column(
+                const SizedBox(height: AppSpacing.xxl),
+                if (waiting)
+                  const _OpponentSkeleton()
+                else
+                  _OpponentCard(
+                    rank: rank,
+                    rankName: rankName,
+                    rankColor: rankColor,
+                  ),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppSectionHeader(title: 'Match rules'),
+                AppListGroup(
                   children: [
-                    Text(rankData['emoji'] as String,
-                      style: const TextStyle(fontSize: 48)),
-                    const SizedBox(height: 8),
-                    Text(rankData['name'] as String,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(rankData['color'] as int),
-                      )),
-                    const SizedBox(height: 8),
-                    Text('$points Points',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textPrimary(isDark),
-                      )),
-                    const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 8,
-                        backgroundColor: Colors.grey.withValues(alpha: 0.3),
-                        valueColor: AlwaysStoppedAnimation(
-                          Color(rankData['color'] as int)),
-                      ),
+                    _RuleRow(
+                      icon: AppIcons.timer,
+                      label: 'Timer',
+                      trailing: Text('10:00', style: context.mono(size: 16)),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      rank == DebateRank.grandmaster
-                          ? 'Max Rank!'
-                          : '${(progress * 100).toInt()}% to next rank',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary(isDark),
+                    _RuleRow(
+                      icon: AppIcons.forDifficulty(rankName),
+                      label: 'Difficulty',
+                      trailing: waiting
+                          ? const AppSkeleton(width: 88, height: 28)
+                          : AppPill.difficulty(rankName),
+                    ),
+                    _RuleRow(
+                      icon: AppIcons.topic,
+                      label: 'Topic',
+                      trailing: Text(
+                        topic,
+                        style: context.text.bodyMedium,
+                        textAlign: TextAlign.end,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      trailingFlex: true,
+                    ),
+                    _RuleRow(
+                      icon: AppIcons.forStance(stance),
+                      label: 'Stance',
+                      trailing: AppPill.stance(stance),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              // AI Difficulty Info
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surf(isDark),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border(isDark)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.psychology, color: AppColors.primary, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'AI Difficulty',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary(isDark),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${rankData['emoji']} ${rankData['name']} level',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(rankData['color'] as int),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'The AI will debate at a difficulty matching your rank',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: AppColors.textSecondary(isDark),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Points at Stake
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surf(isDark),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border(isDark)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Points at Stake',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary(isDark),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _PointsPreview(label: 'Win (50+)', value: '+10 to +50', color: Colors.green, isDark: isDark),
-                        _PointsPreview(label: 'Loss (<50)', value: '-10 to -20', color: Colors.red, isDark: isDark),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              // Enter Match Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    backgroundColor: Colors.amber,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        topic: topic,
-                        stance: stance,
-                        difficulty: rankData['name'] as String,
-                        timerMinutes: 10, // always 10 in ranked
-                        mode: DebateMode.ranked,
-                      ),
-                    ),
-                  ),
-                  child: const Text('Enter Ranked Match 🏆',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    )),
-                ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.xxl),
+                _PointsCard(win: win, loss: loss),
+              ],
+            ),
           ),
-        );
-      },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.md,
+            AppSpacing.gutter,
+            AppSpacing.gutter,
+          ),
+          child: AppButton.primary(
+            label: 'Start ranked debate',
+            icon: AppIcons.ranked,
+            onPressed: waiting ? null : () => _start(context, rankName),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label, value;
-  final bool isDark;
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.isDark = false,
+/// "Opponent calibrated to {Rank}" with the rank's icon and colour.
+class _OpponentCard extends StatelessWidget {
+  final DebateRank rank;
+  final String rankName;
+  final Color rankColor;
+
+  const _OpponentCard({
+    required this.rank,
+    required this.rankName,
+    required this.rankColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return AppCard(
       child: Row(
         children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 10),
-          Text('$label:', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(value)),
+          AppIconTile(
+            icon: AppIcons.forRank(rank),
+            color: rankColor,
+            background: rankColor.withValues(alpha: 0.12),
+            size: 52,
+            iconSize: 26,
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Opponent calibrated to $rankName',
+                  style: context.text.titleSmall,
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  'ClashBot debates at the level of your current rank. Climb, and it sharpens with you.',
+                  style: context.text.bodySmall,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _PointsPreview extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  final bool isDark;
-  const _PointsPreview({
+class _OpponentSkeleton extends StatelessWidget {
+  const _OpponentSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppCard(
+      child: Row(
+        children: [
+          AppSkeleton.block(width: 52, height: 52),
+          SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppSkeleton.line(width: 200, height: 14),
+                SizedBox(height: AppSpacing.sm),
+                AppSkeleton.line(height: 12),
+                SizedBox(height: AppSpacing.xs),
+                AppSkeleton.line(width: 160, height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A fixed-rule row: leading icon, label, trailing value.
+class _RuleRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Widget trailing;
+
+  /// When true the trailing widget takes the remaining width (long text).
+  final bool trailingFlex;
+
+  const _RuleRow({
+    required this.icon,
     required this.label,
+    required this.trailing,
+    this.trailingFlex = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: c.textSecondary),
+          const SizedBox(width: AppSpacing.md),
+          Text(label, style: context.text.bodyMedium),
+          const SizedBox(width: AppSpacing.lg),
+          if (trailingFlex)
+            Expanded(child: trailing)
+          else ...[
+            const Spacer(),
+            trailing,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Win / loss extremes side by side.
+class _PointsCard extends StatelessWidget {
+  final int win;
+  final int loss;
+  const _PointsCard({required this.win, required this.loss});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard(
+      level: AppCardLevel.raised,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(AppIcons.points, size: 18, color: c.textSecondary),
+              const SizedBox(width: AppSpacing.sm),
+              Text('Points at stake', style: context.text.titleSmall),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: _PointsColumn(
+                  caption: 'Win, up to',
+                  value: '+$win',
+                  color: c.positiveText,
+                ),
+              ),
+              Container(width: 1, height: 44, color: c.border),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: _PointsColumn(
+                  caption: 'Loss, down to',
+                  value: '$loss',
+                  color: c.negativeText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Score 50 or more to win. Higher scores earn more.',
+            style: context.text.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PointsColumn extends StatelessWidget {
+  final String caption;
+  final String value;
+  final Color color;
+
+  const _PointsColumn({
+    required this.caption,
     required this.value,
     required this.color,
-    this.isDark = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(caption, style: context.text.bodySmall),
+        const SizedBox(height: AppSpacing.xs),
+        Text(value, style: context.mono(size: 24, color: color)),
       ],
+    );
+  }
+}
+
+/// Desktop side panel: what makes ranked different.
+class _HowRankedWorksPanel extends StatelessWidget {
+  const _HowRankedWorksPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
+      child: AppReveal(
+        index: 3,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppOverline('How ranked works'),
+            const SizedBox(height: AppSpacing.md),
+            const AppListGroup(
+              children: [
+                _InfoRow(
+                  icon: AppIcons.timer,
+                  title: 'Ten minutes, always',
+                  description: 'Every ranked debate runs on the same clock.',
+                ),
+                _InfoRow(
+                  icon: AppIcons.ranked,
+                  title: 'Your rank sets the bar',
+                  description: 'Higher ranks face a sharper opponent.',
+                ),
+                _InfoRow(
+                  icon: AppIcons.points,
+                  title: 'Points follow your score',
+                  description: 'Win big to climb fast; a weak showing costs points.',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconTile(icon: icon, size: 40, iconSize: 20),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: context.text.titleSmall),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(description, style: context.text.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

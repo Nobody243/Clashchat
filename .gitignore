@@ -76,3 +76,6 @@ android/app/my-release-key.jks
 android/app/google-services.json
 android/signing_report.txt
 *.jks
+# Flutter-generated ephemeral build config (contains local machine paths)
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/

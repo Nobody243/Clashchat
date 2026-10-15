@@ -1,13 +1,13 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../core/app_colors.dart';
+
 import '../services/auth_service.dart';
 import '../services/session_service.dart';
-import 'login_screen.dart';
+import '../ui/ui.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 
+/// Splash: wordmark, a brass rule that draws itself, one line of tagline.
+/// Stays on screen for the same 4 s as before, then routes by auth state.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,21 +16,32 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _lottiCtrl;
+    with SingleTickerProviderStateMixin {
+  static const _total = Duration(milliseconds: 4000);
+  static const _ruleWidth = 56.0;
+
   late final AnimationController _mainCtrl;
+
+  // Timeline fractions of the 4000 ms controller.
+  // Wordmark fades up over the first 600 ms; the rule draws over the next
+  // 500 ms (0.15 -> 0.275); the tagline follows.
+  late final Animation<double> _wordmark = CurvedAnimation(
+    parent: _mainCtrl,
+    curve: const Interval(0.0, 0.15, curve: Curves.easeOutCubic),
+  );
+  late final Animation<double> _rule = CurvedAnimation(
+    parent: _mainCtrl,
+    curve: const Interval(0.15, 0.275, curve: Curves.easeOutCubic),
+  );
+  late final Animation<double> _tagline = CurvedAnimation(
+    parent: _mainCtrl,
+    curve: const Interval(0.275, 0.40, curve: Curves.easeOutCubic),
+  );
 
   @override
   void initState() {
     super.initState();
-    _lottiCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2300),
-    );
-    _mainCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    )..forward();
+    _mainCtrl = AnimationController(vsync: this, duration: _total)..forward();
 
     _mainCtrl.addStatusListener((status) async {
       if (status == AnimationStatus.completed) {
@@ -71,348 +82,81 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _lottiCtrl.dispose();
     _mainCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final screenWidth = size.width;
-    final screenHeight = size.height;
-    final botCenterY =
-        screenHeight * 0.18 + 80; // approximate center of bot (height 160)
-
-    // Act 1: Bot entrance
-    final botOpacity = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.0, 0.2, curve: Curves.easeOut),
-      ),
-    );
-    final botScale = Tween(begin: 0.75, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.0, 0.2, curve: Curves.easeOutBack),
-      ),
-    );
-
-    // Act 2: Shockwave
-    final shockwaveAnim = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.45, 0.60, curve: Curves.easeOut),
-      ),
-    );
-
-    // Act 3: Logo slide & spark
-    final clashSlide = Tween(begin: -60.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.55, 0.80, curve: Curves.easeOutCubic),
-      ),
-    );
-    final chatSlide = Tween(begin: 60.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.55, 0.80, curve: Curves.easeOutCubic),
-      ),
-    );
-    final logoOpacity = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.55, 0.72, curve: Curves.easeOut),
-      ),
-    );
-    final sparkAnim = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.78, 0.85, curve: Curves.easeOut),
-      ),
-    );
-
-    // Act 4: Tagline & underline
-    final taglineOpacity = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.80, 0.92, curve: Curves.easeOut),
-      ),
-    );
-    final taglineSlide = Tween(begin: 12.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.80, 0.92, curve: Curves.easeOut),
-      ),
-    );
-    final underlineAnim = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainCtrl,
-        curve: const Interval(0.88, 0.97, curve: Curves.easeOut),
-      ),
-    );
+    final c = context.colors;
+    final reduce = context.reduceMotion;
+    final wordmarkStyle = context.text.displaySmall;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.5,
-            colors: [
-              Color(0xFF2D1B54), // Vibrant purple glow at top
-              Color(0xFF0F1A3A), // Deep blue mid
-              Color(0xFF0A0A0F), // Dark base
-            ],
-            stops: [0.0, 0.4, 1.0],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // 1. Shockwave painter
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: shockwaveAnim,
-                builder: (_, _) => CustomPaint(
-                  painter: ShockwavePainter(
-                    progress: shockwaveAnim.value,
-                    center: Offset(screenWidth / 2, botCenterY),
-                  ),
-                ),
-              ),
-            ),
+      backgroundColor: c.background,
+      body: Center(
+        child: AnimatedBuilder(
+          animation: _mainCtrl,
+          builder: (context, _) {
+            final w = reduce ? 1.0 : _wordmark.value;
+            final r = reduce ? 1.0 : _rule.value;
+            final t = reduce ? 1.0 : _tagline.value;
 
-            // 2. Lottie bot
-            Positioned(
-              top: screenHeight * 0.18,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _mainCtrl,
-                builder: (_, _) => FadeTransition(
-                  opacity: botOpacity,
-                  child: ScaleTransition(
-                    scale: botScale,
-                    child: Center(
-                      child: Lottie.asset(
-                        'assets/lottie/ChatAi.json',
-                        controller: _lottiCtrl,
-                        width: 200,
-                        height: 160,
-                        fit: BoxFit.contain,
-                        onLoaded: (comp) {
-                          _lottiCtrl.duration = comp.duration;
-                          _lottiCtrl.forward();
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // 3. Logo text row + Spark
-            Positioned(
-              top: screenHeight * 0.52,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _mainCtrl,
-                builder: (_, _) => Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Opacity(
-                      opacity: logoOpacity.value,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Opacity(
+                  opacity: w,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - w) * 8),
+                    child: Text.rich(
+                      TextSpan(
                         children: [
-                          Transform.translate(
-                            offset: Offset(clashSlide.value, 0),
-                            child: Text(
-                              'Clash',
-                              style: GoogleFonts.poppins(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
+                          TextSpan(
+                            text: 'Clash',
+                            style: wordmarkStyle?.copyWith(color: c.textPrimary),
                           ),
-                          Transform.translate(
-                            offset: Offset(chatSlide.value, 0),
-                            child: Text(
-                              'Chat',
-                              style: GoogleFonts.poppins(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF7F77DD),
-                              ),
-                            ),
+                          TextSpan(
+                            text: 'Chat',
+                            style: wordmarkStyle?.copyWith(color: c.accent),
                           ),
                         ],
                       ),
+                      semanticsLabel: 'ClashChat',
                     ),
-                    // Spark painter
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: SparkPainter(
-                          progress: sparkAnim.value,
-                          center: Offset(
-                            screenWidth / 2,
-                            27,
-                          ), // Offset vertically to align with center of text
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-
-            // 4. Tagline
-            Positioned(
-              top: screenHeight * 0.60,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _mainCtrl,
-                builder: (_, _) => Transform.translate(
-                  offset: Offset(0, taglineSlide.value),
-                  child: Opacity(
-                    opacity: taglineOpacity.value,
-                    child: Center(
-                      child: Text(
-                        'Debate. Score. Dominate.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: const Color(0xFF444466),
-                          letterSpacing: 0.5,
-                        ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: _ruleWidth,
+                  height: 2,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: _ruleWidth * r,
+                      height: 2,
+                      color: c.accent,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Opacity(
+                  opacity: t,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - t) * 8),
+                    child: Text(
+                      'Argue better.',
+                      style: context.text.bodySmall?.copyWith(
+                        color: c.textSecondary,
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-
-            // 5. Underline painter
-            Positioned(
-              top: screenHeight * 0.635,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _mainCtrl,
-                builder: (_, _) => CustomPaint(
-                  painter: UnderlinePainter(
-                    progress: underlineAnim.value,
-                    center: Offset(screenWidth / 2, 0),
-                  ),
-                  size: Size(screenWidth, 10),
-                ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
-}
-
-class ShockwavePainter extends CustomPainter {
-  final double progress;
-  final Offset center;
-  ShockwavePainter({required this.progress, required this.center});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || progress >= 1) return;
-    final maxRadius = size.width * 0.85;
-    final radius = maxRadius * Curves.easeOut.transform(progress);
-    final opacity = (1.0 - progress).clamp(0.0, 1.0);
-
-    // Outer ring
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = const Color(0xFF7F77DD).withValues(alpha: opacity * 0.6),
-    );
-    // Inner ring
-    if (progress > 0.15) {
-      final innerRadius = maxRadius * Curves.easeOut.transform(progress - 0.15);
-      canvas.drawCircle(
-        center,
-        innerRadius,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.8
-          ..color = const Color(
-            0xFF7F77DD,
-          ).withValues(alpha: (1.0 - (progress - 0.15)).clamp(0.0, 1.0) * 0.3),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(ShockwavePainter old) => old.progress != progress;
-}
-
-class SparkPainter extends CustomPainter {
-  final double progress;
-  final Offset center;
-  SparkPainter({required this.progress, required this.center});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || progress >= 1) return;
-    final paint = Paint()
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(
-        0xFFCECBF6,
-      ).withValues(alpha: (1 - progress).clamp(0.0, 1.0));
-    final length = 12.0 * progress;
-    final angles = [0, 45, 90, 135, 180, 225, 270, 315];
-    for (final deg in angles) {
-      final rad = deg * 3.14159 / 180;
-      final start = Offset(
-        center.dx + 4 * math.cos(rad),
-        center.dy + 4 * math.sin(rad),
-      );
-      final end = Offset(
-        center.dx + (4 + length) * math.cos(rad),
-        center.dy + (4 + length) * math.sin(rad),
-      );
-      canvas.drawLine(start, end, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(SparkPainter old) => old.progress != progress;
-}
-
-class UnderlinePainter extends CustomPainter {
-  final double progress;
-  final Offset center;
-  UnderlinePainter({required this.progress, required this.center});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0) return;
-    final paint = Paint()
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round
-      ..color = const Color(0xFF7F77DD);
-
-    final currentWidth = 80.0 * progress; // 80px each side at full width
-
-    // Draw outward from center
-    canvas.drawLine(center, Offset(center.dx - currentWidth, center.dy), paint);
-    canvas.drawLine(center, Offset(center.dx + currentWidth, center.dy), paint);
-  }
-
-  @override
-  bool shouldRepaint(UnderlinePainter old) => old.progress != progress;
 }

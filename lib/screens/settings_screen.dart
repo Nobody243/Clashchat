@@ -1,173 +1,109 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
+
 import '../core/responsive_layout.dart';
+import '../core/theme_provider.dart';
+import '../ui/ui.dart';
 import '../widgets/desktop_page_shell.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+  static const double _maxWidth = 640;
+  static const String _version = '1.0.2';
+
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final textPrimary = AppColors.textPrimary(isDark);
-    final textSecondary = AppColors.textSecondary(isDark);
+    final c = context.colors;
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
-    final isWideDesktop = screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+    final isWideDesktop =
+        screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
 
-    Widget settingsScroll({required EdgeInsets padding}) {
-      return SingleChildScrollView(
-        padding: padding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final content = StaggeredColumn(
+      children: [
+        Text('Settings', style: context.text.headlineMedium),
+        AppSpacing.vXxl,
+        const AppSectionHeader(title: 'Appearance'),
+        AppListGroup(
           children: [
-            Text(
-                  'Settings',
-                  style: GoogleFonts.poppins(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: textPrimary,
-                  ),
-                )
-                .animate()
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-            const SizedBox(height: 28),
-
-            _SectionLabel(label: 'Appearance', textColor: textSecondary)
-                .animate(delay: 50.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-            const SizedBox(height: 10),
-            _SettingsTile(
-                  isDark: isDark,
-                  icon: isDark
-                      ? Icons.nightlight_round
-                      : Icons.wb_sunny_rounded,
-                  iconColor: isDark
-                      ? const Color(0xFF9B59B6)
-                      : const Color(0xFFFFA500),
-                  title: 'Dark Mode',
-                  titleColor: textPrimary,
-                  trailing: Switch.adaptive(
-                    value: isDark,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.primary,
-                    onChanged: (_) => context.read<ThemeProvider>().toggle(),
-                  ),
-                )
-                .animate(delay: 100.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-
-
-            const SizedBox(height: 20),
-            _SectionLabel(label: 'About', textColor: textSecondary)
-                .animate(delay: 350.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-            const SizedBox(height: 10),
-            _SettingsTile(
-                  isDark: isDark,
-                  icon: Icons.info_outline_rounded,
-                  iconColor: AppColors.primary,
-                  title: 'App Version',
-                  titleColor: textPrimary,
-                  subtitle: '1.0.0',
-                  subtitleColor: textSecondary,
-                )
-                .animate(delay: 400.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-            const SizedBox(height: 8),
-            _SettingsTile(
-                  isDark: isDark,
-                  icon: Icons.privacy_tip_outlined,
-                  iconColor: AppColors.secondary,
-                  title: 'Privacy Policy',
-                  titleColor: textPrimary,
-                  onTap: () {},
-                )
-                .animate(delay: 450.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-            const SizedBox(height: 8),
-            _SettingsTile(
-                  isDark: isDark,
-                  icon: Icons.description_outlined,
-                  iconColor: AppColors.textSecondary(isDark),
-                  title: 'Terms of Service',
-                  titleColor: textPrimary,
-                  onTap: () {},
-                )
-                .animate(delay: 500.ms)
-                .fadeIn(duration: 400.ms, curve: Curves.easeOutExpo)
-                .slideY(
-                  begin: 0.1,
-                  duration: 400.ms,
-                  curve: Curves.easeOutExpo,
-                ),
-
-            const SizedBox(height: 40),
+            _SettingsRow(
+              icon: AppIcons.moon,
+              title: 'Dark mode',
+              subtitle: 'Arena Night is the default',
+              onTap: () => context.read<ThemeProvider>().toggle(),
+              trailing: Switch(
+                value: context.watch<ThemeProvider>().isDark,
+                onChanged: (_) => context.read<ThemeProvider>().toggle(),
+              ),
+            ),
           ],
         ),
-      );
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-              ? [AppColors.background, AppColors.surface]
-              : [AppColors.backgroundLight, AppColors.surfaceDeepLight],
+        AppSpacing.vXxl,
+        const AppSectionHeader(title: 'Preferences'),
+        const AppListGroup(
+          children: [
+            _SettingsRow(
+              icon: AppIcons.bell,
+              title: 'Notifications',
+              subtitle: 'Reminders when your daily quota resets',
+              trailing: AppPill(label: 'Coming soon'),
+            ),
+            _SettingsRow(
+              icon: AppIcons.speaker,
+              title: 'Sound effects',
+              subtitle: 'Timer and result cues',
+              trailing: AppPill(label: 'Coming soon'),
+            ),
+          ],
         ),
-      ),
+        AppSpacing.vXxl,
+        const AppSectionHeader(title: 'About'),
+        AppListGroup(
+          children: [
+            _SettingsRow(
+              icon: AppIcons.info,
+              title: 'Version',
+              trailing: Text(
+                _version,
+                style: context.mono(size: 12, color: c.textSecondary),
+              ),
+            ),
+            _SettingsRow(
+              icon: AppIcons.shield,
+              title: 'Privacy policy',
+              onTap: () {},
+            ),
+            _SettingsRow(
+              icon: AppIcons.document,
+              title: 'Terms of service',
+              onTap: () {},
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return ColoredBox(
+      color: c.background,
       child: SafeArea(
         top: !isDesktop,
         child: isWideDesktop
             ? DesktopPageShell(
-                maxWidth: 800,
-                child: settingsScroll(padding: EdgeInsets.zero),
+                maxWidth: _maxWidth,
+                child: SingleChildScrollView(child: content),
               )
             : Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: settingsScroll(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: isDesktop ? 12 : 20,
+                  constraints: const BoxConstraints(maxWidth: _maxWidth),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      isDesktop ? AppSpacing.xxxl : AppSpacing.xl,
+                      AppSpacing.gutter,
+                      AppSpacing.xxxl,
                     ),
+                    child: content,
                   ),
                 ),
               ),
@@ -176,100 +112,62 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  final Color textColor;
-  const _SectionLabel({required this.label, required this.textColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: GoogleFonts.poppins(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: textColor,
-        letterSpacing: 1.2,
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  final bool isDark;
+class _SettingsRow extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
   final String title;
-  final Color titleColor;
   final String? subtitle;
-  final Color? subtitleColor;
   final Widget? trailing;
   final VoidCallback? onTap;
 
-  const _SettingsTile({
-    required this.isDark,
+  const _SettingsRow({
     required this.icon,
-    required this.iconColor,
     required this.title,
-    required this.titleColor,
     this.subtitle,
-    this.subtitleColor,
     this.trailing,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      decoration: BoxDecoration(
-        color: AppColors.surf(isDark),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border(isDark)),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: ListTile(
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: iconColor, size: 20),
+    final c = context.colors;
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: title,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
         ),
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: titleColor,
-          ),
+        child: Row(
+          children: [
+            AppIconTile(
+              icon: icon,
+              color: c.textSecondary,
+              background: c.surfaceRaised,
+              size: 36,
+              iconSize: 18,
+              radius: AppRadius.smAll,
+            ),
+            AppSpacing.hMd,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: context.text.titleSmall),
+                  if (subtitle != null) ...[
+                    AppSpacing.vXs,
+                    Text(subtitle!, style: context.text.bodySmall),
+                  ],
+                ],
+              ),
+            ),
+            AppSpacing.hMd,
+            if (trailing != null)
+              trailing!
+            else if (onTap != null)
+              Icon(AppIcons.forward, size: 18, color: c.textHint),
+          ],
         ),
-        subtitle: subtitle != null
-            ? Text(
-                subtitle!,
-                style: GoogleFonts.poppins(fontSize: 12, color: subtitleColor),
-              )
-            : null,
-        trailing:
-            trailing ??
-            (onTap != null
-                ? Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.textHint(isDark),
-                  )
-                : null),
       ),
     );
   }

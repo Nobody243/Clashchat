@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
-import 'chat_screen.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
-import '../models/debate_mode.dart';
 
+import '../core/responsive_layout.dart';
+import '../models/debate_mode.dart';
+import '../ui/ui.dart';
+import '../widgets/setup_back_button.dart';
+import 'chat_screen.dart';
+
+/// Standalone opponent-strength picker for a casual debate. Replaces itself
+/// with the chat once a strength is confirmed.
 class DifficultyScreen extends StatefulWidget {
   final String topic;
   final String stance;
@@ -22,24 +23,19 @@ class DifficultyScreen extends StatefulWidget {
   State<DifficultyScreen> createState() => _DifficultyScreenState();
 }
 
-class _DifficultyScreenState extends State<DifficultyScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animCtrl;
+class _DifficultyScreenState extends State<DifficultyScreen> {
+  static const List<({String value, String desc})> _difficulties = [
+    (value: 'easy', desc: 'Simple language, makes logical slips'),
+    (value: 'medium', desc: 'Clear logic and fair arguments'),
+    (value: 'hard', desc: 'Advanced reasoning, sharp rebuttals'),
+  ];
 
-  @override
-  void initState() {
-    super.initState();
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _animCtrl.forward();
-  }
+  String _difficulty = 'medium';
 
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
+  void _select(String value) {
+    if (_difficulty == value) return;
+    HapticFeedback.selectionClick();
+    setState(() => _difficulty = value);
   }
 
   void _selectDifficulty(String difficulty) {
@@ -57,196 +53,190 @@ class _DifficultyScreenState extends State<DifficultyScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 600;
+    final isDesktop =
+        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
 
-    final bgStart = isDark
-        ? const Color(0xFF1A1A2E)
-        : AppColors.backgroundLight;
-    final bgEnd = isDark ? const Color(0xFF0F3460) : AppColors.surfaceDeepLight;
-
+    final column = _buildColumn();
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [bgStart, bgEnd],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16.0 : 40.0,
-                vertical: isMobile ? 20.0 : 32.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 20,
-                      ),
-                    ),
-                  ).animate(controller: _animCtrl).fadeIn().slideX(begin: -0.3),
-                  SizedBox(height: isMobile ? 32 : 48),
+      appBar: AppBar(
+        leading: const SetupBackButton(),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: isDesktop
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: column,
+                ),
+              )
+            : column,
+      ),
+    );
+  }
 
-                  // Header Section
-                  Column(
+  Widget _buildColumn() {
+    final c = context.colors;
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gutter,
+              AppSpacing.sm,
+              AppSpacing.gutter,
+              AppSpacing.xxl,
+            ),
+            child: StaggeredColumn(
+              children: [
+                const AppOverline('Step 3 of 3'),
+                const SizedBox(height: AppSpacing.sm),
+                Text('Choose your opponent',
+                    style: context.text.headlineMedium),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Pick the strength that matches your confidence today.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: c.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                AppCard(
+                  level: AppCardLevel.raised,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Choose Your',
-                        style: GoogleFonts.poppins(
-                          fontSize: isMobile ? 26 : 32,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary(isDark),
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(
+                              AppIcons.topic,
+                              size: 20,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              widget.topic,
+                              style: context.text.bodyMedium,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                            'Difficulty',
-                            style: GoogleFonts.poppins(
-                              fontSize: isMobile ? 40 : 52,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primary,
-                              height: 1.1,
-                            ),
-                          )
-                          .animate(controller: _animCtrl)
-                          .fadeIn()
-                          .slideY(begin: 0.2),
-                      SizedBox(height: isMobile ? 14 : 18),
-                      Text(
-                            'Pick the AI opponent that matches your skill level and confidence',
-                            style: GoogleFonts.poppins(
-                              fontSize: isMobile ? 14 : 15,
-                              fontWeight: FontWeight.w400,
-                              height: 1.6,
-                              color: AppColors.textSecondary(isDark),
-                            ),
-                          )
-                          .animate(controller: _animCtrl)
-                          .fadeIn()
-                          .slideY(begin: 0.2, delay: 50.ms),
+                      const SizedBox(height: AppSpacing.md),
+                      Divider(height: 1, thickness: 1, color: c.border),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Text('Your stance', style: context.text.bodySmall),
+                          const Spacer(),
+                          AppPill.stance(widget.stance),
+                        ],
+                      ),
                     ],
                   ),
-                  SizedBox(height: isMobile ? 40 : 56),
-
-                  // Difficulty Cards
-                  _DifficultyCard(
-                    emoji: '🟢',
-                    title: 'Easy',
-                    subtitle: 'Perfect for Learning',
-                    description:
-                        'Uses simple language and makes logical mistakes. Great for building confidence.',
-                    color: const Color(0xFF10B981),
-                    accentColor: const Color(0xFF6EE7B7),
-                    onTap: () => _selectDifficulty('easy'),
-                    delay: 0,
-                    animCtrl: _animCtrl,
-                    isDark: isDark,
-                    isMobile: isMobile,
-                  ),
-                  SizedBox(height: isMobile ? 16 : 20),
-                  _DifficultyCard(
-                    emoji: '🟡',
-                    title: 'Medium',
-                    subtitle: 'Real Competition',
-                    description:
-                        'Uses clear logic and fair arguments. Will challenge your thinking skills.',
-                    color: const Color(0xFFF59E0B),
-                    accentColor: const Color(0xFFFCD34D),
-                    onTap: () => _selectDifficulty('medium'),
-                    delay: 100,
-                    animCtrl: _animCtrl,
-                    isDark: isDark,
-                    isMobile: isMobile,
-                  ),
-                  SizedBox(height: isMobile ? 16 : 20),
-                  _DifficultyCard(
-                    emoji: '🔴',
-                    title: 'Hard',
-                    subtitle: 'Master Challenge',
-                    description:
-                        'Advanced reasoning and sharp rebuttals. Only for experienced debaters.',
-                    color: const Color(0xFFEF4444),
-                    accentColor: const Color(0xFFFCA5A5),
-                    onTap: () => _selectDifficulty('hard'),
-                    delay: 200,
-                    animCtrl: _animCtrl,
-                    isDark: isDark,
-                    isMobile: isMobile,
-                  ),
-                  SizedBox(height: isMobile ? 32 : 48),
-
-                  // Topic display
-                  Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isMobile ? 16 : 20,
-                          vertical: isMobile ? 14 : 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.25),
-                            width: 1.5,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.lightbulb_rounded,
-                              color: AppColors.primary,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Debate Topic',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.textSecondary(isDark),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.topic,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: isMobile ? 14 : 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary(isDark),
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      .animate(controller: _animCtrl)
-                      .fadeIn()
-                      .slideY(delay: 300.ms),
-                ],
-              ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppSectionHeader(title: 'Opponent strength'),
+                AppListGroup(
+                  children: [
+                    for (final d in _difficulties)
+                      _DifficultyRow(
+                        name: d.value,
+                        description: d.desc,
+                        selected: _difficulty == d.value,
+                        onTap: () => _select(d.value),
+                      ),
+                  ],
+                ),
+              ],
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.md,
+            AppSpacing.gutter,
+            AppSpacing.gutter,
+          ),
+          child: AppButton.primary(
+            label: 'Start debate',
+            icon: AppIcons.play,
+            onPressed: () => _selectDifficulty(_difficulty),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One selectable difficulty row inside an [AppListGroup].
+class _DifficultyRow extends StatelessWidget {
+  final String name;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DifficultyRow({
+    required this.name,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final (Color fg, Color bg) = switch (name.trim().toLowerCase()) {
+      'easy' => (c.positiveText, c.positiveBg),
+      'hard' => (c.negativeText, c.negativeBg),
+      _ => (c.warningText, c.warningBg),
+    };
+    final title = name.isEmpty
+        ? name
+        : name[0].toUpperCase() + name.substring(1).toLowerCase();
+
+    return Semantics(
+      selected: selected,
+      child: Pressable(
+        onTap: onTap,
+        pressedScale: 0.99,
+        semanticLabel: title,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              AppIconTile(
+                icon: AppIcons.forDifficulty(name, duotone: true),
+                color: fg,
+                background: bg,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: context.text.titleSmall),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      description,
+                      style: context.text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _RadioMark(selected: selected),
+            ],
           ),
         ),
       ),
@@ -254,177 +244,39 @@ class _DifficultyScreenState extends State<DifficultyScreen>
   }
 }
 
-class _DifficultyCard extends StatefulWidget {
-  final String emoji;
-  final String title;
-  final String subtitle;
-  final String description;
-  final Color color;
-  final Color accentColor;
-  final VoidCallback onTap;
-  final int delay;
-  final AnimationController animCtrl;
-  final bool isDark;
-  final bool isMobile;
-
-  const _DifficultyCard({
-    required this.emoji,
-    required this.title,
-    required this.subtitle,
-    required this.description,
-    required this.color,
-    required this.accentColor,
-    required this.onTap,
-    required this.delay,
-    required this.animCtrl,
-    required this.isDark,
-    required this.isMobile,
-  });
-
-  @override
-  State<_DifficultyCard> createState() => _DifficultyCardState();
-}
-
-class _DifficultyCardState extends State<_DifficultyCard> {
-  bool _isHovering = false;
+/// Radio-like trailing indicator: filled check when selected, outline otherwise.
+class _RadioMark extends StatelessWidget {
+  final bool selected;
+  const _RadioMark({required this.selected});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () async {
-        HapticFeedback.lightImpact();
-        await Future.delayed(const Duration(milliseconds: 150));
-        widget.onTap();
-      },
-      borderRadius: BorderRadius.circular(18),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovering = true),
-        onExit: (_) => setState(() => _isHovering = false),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          transform: _isHovering
-              ? (Matrix4.diagonal3Values(1.02, 1.02, 1.0))
-              : Matrix4.identity(),
-          child:
-              Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          widget.color.withValues(alpha: 0.1),
-                          widget.color.withValues(alpha: 0.03),
-                        ],
-                      ),
-                      border: Border.all(
-                        color: _isHovering
-                            ? widget.color.withValues(alpha: 0.7)
-                            : widget.color.withValues(alpha: 0.35),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: _isHovering
-                          ? [
-                              BoxShadow(
-                                color: widget.color.withValues(alpha: 0.2),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                            ]
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                    ),
-                    padding: EdgeInsets.all(widget.isMobile ? 18 : 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: widget.color.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Text(
-                                widget.emoji,
-                                style: TextStyle(
-                                  fontSize: widget.isMobile ? 28 : 32,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.title,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: widget.isMobile ? 20 : 24,
-                                      fontWeight: FontWeight.w800,
-                                      color: widget.color,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.subtitle,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: widget.isMobile ? 12 : 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: widget.accentColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          widget.description,
-                          style: GoogleFonts.poppins(
-                            fontSize: widget.isMobile ? 13 : 14,
-                            fontWeight: FontWeight.w400,
-                            height: 1.6,
-                            color: AppColors.textSecondary(widget.isDark),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              color: widget.color.withValues(alpha: 0.5),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Start Debate',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: widget.color.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  )
-                  .animate(controller: widget.animCtrl)
-                  .fadeIn(delay: Duration(milliseconds: widget.delay))
-                  .slideY(
-                    begin: 0.3,
-                    delay: Duration(milliseconds: widget.delay),
+    final c = context.colors;
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        child: selected
+            ? Icon(
+                AppIcons.checkCircle,
+                key: const ValueKey('on'),
+                size: 22,
+                color: c.accent,
+              )
+            : Center(
+                key: const ValueKey('off'),
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: c.borderStrong, width: 1.5),
                   ),
-        ),
+                ),
+              ),
       ),
     );
   }

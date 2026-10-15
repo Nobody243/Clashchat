@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
 
+import '../ui/ui.dart';
+
+/// Bottom composer: a raised pill holding a borderless multiline field and a
+/// 40 px circular send button.
 class ChatInputBar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
@@ -21,76 +21,69 @@ class ChatInputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
+    final c = context.colors;
+    final text = context.text;
     final canInput = enabled && !isSending;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.xs,
+            AppSpacing.xs,
+            AppSpacing.xs,
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: c.surfaceRaised,
+            borderRadius: AppRadius.xlAll,
+            border: Border.all(color: c.border),
+          ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.surfaceDeep
-                        : AppColors.surfaceDeepLight,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : const Color(0xFFE4DFF5),
+                child: TextField(
+                  controller: controller,
+                  enabled: canInput,
+                  minLines: 1,
+                  maxLines: 5,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.send,
+                  textCapitalization: TextCapitalization.sentences,
+                  cursorColor: c.accent,
+                  style: text.bodyMedium?.copyWith(
+                    color: canInput ? c.textPrimary : c.textHint,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Make your point…',
+                    hintStyle: text.bodyMedium?.copyWith(color: c.textHint),
+                    filled: false,
+                    isDense: true,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md,
                     ),
                   ),
-                  child: TextField(
-                    controller: controller,
-                    enabled: canInput,
-                    style: GoogleFonts.poppins(
-                      color: canInput
-                          ? AppColors.textPrimary(isDark)
-                          : AppColors.textHint(isDark),
-                      fontSize: 14,
-                    ),
-                    maxLines: null,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      hintText: isSending
-                          ? 'Waiting for response…'
-                          : 'Make your argument…',
-                      hintStyle: GoogleFonts.poppins(
-                        color: AppColors.textHint(isDark),
-                        fontSize: 14,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      border: InputBorder.none,
-                    ),
-                    onSubmitted: canInput ? (_) => onSend() : null,
-                  ),
+                  onSubmitted: canInput ? (_) => onSend() : null,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.sm),
               _SendButton(
                 controller: controller,
-                enabled: enabled,
-                isSending: isSending,
+                enabled: canInput,
                 onSend: onSend,
               ),
             ],
@@ -101,106 +94,49 @@ class ChatInputBar extends StatelessWidget {
   }
 }
 
-class _SendButton extends StatefulWidget {
+class _SendButton extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
   final bool enabled;
-  final bool isSending;
 
   const _SendButton({
     required this.controller,
     required this.onSend,
-    this.enabled = true,
-    this.isSending = false,
+    required this.enabled,
   });
 
   @override
-  State<_SendButton> createState() => _SendButtonState();
-}
-
-class _SendButtonState extends State<_SendButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _scaleAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnim = Tween<double>(
-      begin: 1.0,
-      end: 0.88,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _handleSend() {
-    if (!widget.enabled || widget.isSending) return;
-    _ctrl.reverse();
-    if (widget.controller.text.trim().isNotEmpty) {
-      HapticFeedback.lightImpact();
-      widget.onSend();
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: widget.controller,
+    final c = context.colors;
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
       builder: (context, value, _) {
-        final hasText = value.text.trim().isNotEmpty && widget.enabled && !widget.isSending;
-        return GestureDetector(
-          onTapDown: hasText ? (_) => _ctrl.forward() : null,
-          onTapUp: hasText ? (_) => _handleSend() : null,
-          onTapCancel: hasText ? () => _ctrl.reverse() : null,
-          child: AnimatedOpacity(
-            opacity: hasText ? 1.0 : (widget.isSending ? 0.7 : 0.4),
-            duration: const Duration(milliseconds: 200),
-            child: ScaleTransition(
-              scale: _scaleAnim,
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.primary, AppColors.gold],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: widget.isSending
-                    ? const Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-              ),
+        final active = enabled && value.text.trim().isNotEmpty;
+        return Pressable(
+          enabled: active,
+          pressedScale: 0.92,
+          semanticLabel: 'Send',
+          onTap: active
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onSend();
+                }
+              : null,
+          child: AnimatedContainer(
+            duration: AppDurations.fast,
+            curve: Curves.easeOutCubic,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: active ? c.ctaBg : c.surfaceRaised,
+              shape: BoxShape.circle,
+              border: active ? null : Border.all(color: c.border),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              AppIcons.sendFilled,
+              size: 18,
+              color: active ? c.ctaFg : c.textHint,
             ),
           ),
         );

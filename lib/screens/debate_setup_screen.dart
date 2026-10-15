@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
+import 'package:flutter/services.dart';
+
 import '../core/responsive_layout.dart';
-import '../widgets/desktop_page_shell.dart';
+import '../models/debate_mode.dart';
+import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
 import 'chat_screen.dart';
-import '../models/debate_mode.dart';
 
 class DebateSetupScreen extends StatefulWidget {
   final String topic;
@@ -30,711 +28,26 @@ class _DebateSetupScreenState extends State<DebateSetupScreen> {
   int? _timerMinutes; // null = no timer
   bool _timerEnabled = false;
 
-  final List<Map<String, dynamic>> _difficulties = [
-    {
-      'name': 'Easy',
-      'emoji': '🌱',
-      'desc': 'AI is gentle and encouraging',
-      'color': Colors.green,
-    },
-    {
-      'name': 'Medium',
-      'emoji': '⚔️',
-      'desc': 'AI pushes back moderately',
-      'color': Colors.orange,
-    },
-    {
-      'name': 'Hard',
-      'emoji': '🔥',
-      'desc': 'AI is aggressive and sharp',
-      'color': Colors.red,
-    },
+  static const List<({String name, String desc})> _difficulties = [
+    (name: 'Easy', desc: 'Gentle and encouraging'),
+    (name: 'Medium', desc: 'Pushes back moderately'),
+    (name: 'Hard', desc: 'Aggressive and sharp'),
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
-    final isWideDesktop = screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+  bool get _isLearning => widget.mode == DebateMode.learning;
 
-    // Desktop: Two-column layout
-    if (isDesktop) {
-      if (isWideDesktop) {
-        return Scaffold(
-          body: DesktopPageShell(
-            maxWidth: 1200,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left Column: Topic recap and Settings
-                Expanded(
-                  flex: 2,
-                  child: _buildSettingsPanel(isDark, true),
-                ),
-                const SizedBox(width: 32),
-                // Right Column: Preview/Rules
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceDeep : AppColors.surfaceDeepLight,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border(isDark)),
-                    ),
-                    child: _buildRulesPanel(isDark, true),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-
-      return Scaffold(
-        body: Row(
-          children: [
-            // Left Column: Topic recap and Settings
-            Expanded(
-              child: _buildSettingsPanel(isDark, false),
-            ),
-            // Right Column: Preview/Rules
-            Container(
-              width: 340,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDeep : AppColors.surfaceDeepLight,
-                border: Border(
-                  left: BorderSide(
-                    color: isDark ? const Color(0x1AFFFFFF) : AppColors.border(isDark),
-                  ),
-                ),
-              ),
-              child: _buildRulesPanel(isDark, false),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Mobile: Single column layout
-    return Scaffold(
-      appBar: AppBar(title: const Text('Debate Setup')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height - kToolbarHeight,
-              ),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Topic recap
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.topic, color: Colors.blue),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.topic,
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  'Arguing: ${widget.stance}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // Difficulty selector
-                    const Text(
-                      'Difficulty',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: _difficulties.map((d) {
-                        final isSelected = _difficulty == d['name'];
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _difficulty = d['name']),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.only(right: 8),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? (d['color'] as Color).withValues(alpha: 0.2)
-                                    : Colors.grey.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? d['color'] as Color
-                                      : Colors.grey.withValues(alpha: 0.3),
-                                  width: isSelected ? 2 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    d['emoji'],
-                                    style: const TextStyle(fontSize: 24),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    d['name'],
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isSelected ? d['color'] as Color : null,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      d['desc'],
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    if (widget.mode != DebateMode.learning) ...[
-                      // Timer toggle
-                      const Text(
-                        'Timer',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('Enable Timer'),
-                        subtitle: Text(
-                          _timerEnabled
-                              ? 'Debate ends when time runs out'
-                              : 'No time limit',
-                        ),
-                        value: _timerEnabled,
-                        onChanged: (val) => setState(() {
-                          _timerEnabled = val;
-                          if (val) _timerMinutes = 10; // default
-                        }),
-                      ),
-
-                      if (_timerEnabled) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children:
-                              [5, 10, 15].map((mins) {
-                                final isSelected = _timerMinutes == mins;
-                                return Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => setState(() => _timerMinutes = mins),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? Colors.blue.withValues(alpha: 0.2)
-                                            : Colors.grey.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: isSelected ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
-                                          width: isSelected ? 2 : 1,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          const Icon(Icons.timer, size: 20),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '$mins min',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: isSelected ? Colors.blue : null,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList()..add(
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _showCustomTimePicker,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      decoration: BoxDecoration(
-                                        color: (_timerMinutes != null && ![5, 10, 15].contains(_timerMinutes))
-                                            ? Colors.blue.withValues(alpha: 0.2)
-                                            : Colors.grey.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.grey.withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          const Icon(Icons.edit, size: 20),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            (_timerMinutes != null &&
-                                                ![
-                                                  5,
-                                                  10,
-                                                  15,
-                                                ].contains(_timerMinutes))
-                                                ? '$_timerMinutes min'
-                                                : 'Custom',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                        ),
-                      ],
-
-                      const Spacer(),
-
-                      // Start button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            backgroundColor: Colors.blue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          onPressed: _startDebate,
-                          child: const Text(
-                            'Start Debate 🔥',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ] else ...[
-                      const Spacer(),
-                      // Start button for Learning Mode
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            backgroundColor: Colors.blue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          onPressed: _startDebate,
-                          child: const Text(
-                            'Start Learning Session 📚',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  void _selectDifficulty(String name) {
+    if (_difficulty == name) return;
+    HapticFeedback.selectionClick();
+    setState(() => _difficulty = name);
   }
 
-  Widget _buildSettingsPanel(bool isDark, bool isWideDesktop) {
-    return Padding(
-      padding: isWideDesktop
-          ? EdgeInsets.zero
-          : const EdgeInsets.fromLTRB(48, 80, 48, 48),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SetupBackButton(),
-            const SizedBox(height: 24),
-            Text(
-              'Setup Your Debate',
-              style: GoogleFonts.poppins(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Configure difficulty and timer settings',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: AppColors.textSecondary(isDark),
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Topic recap
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.topic, color: Colors.blue, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.topic,
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: AppColors.textPrimary(isDark),
-                          ),
-                        ),
-                        Text(
-                          'Stance: ${widget.stance}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary(isDark),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Difficulty selector
-            Text(
-              'Difficulty',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary(isDark),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: _difficulties.map((d) {
-                final isSelected = _difficulty == d['name'];
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _difficulty = d['name']),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (d['color'] as Color).withValues(alpha: 0.2)
-                            : AppColors.surf(isDark).withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected
-                              ? d['color'] as Color
-                              : AppColors.border(isDark),
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            d['emoji'],
-                            style: const TextStyle(fontSize: 32),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            d['name'],
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: isSelected ? d['color'] as Color : AppColors.textPrimary(isDark),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              d['desc'],
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary(isDark),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            if (widget.mode != DebateMode.learning) ...[
-              const SizedBox(height: 32),
-              // Timer toggle
-              Text(
-                'Timer',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary(isDark),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                title: Text(
-                  'Enable Timer',
-                  style: GoogleFonts.poppins(color: AppColors.textPrimary(isDark)),
-                ),
-                subtitle: Text(
-                  _timerEnabled
-                      ? 'Debate ends when time runs out'
-                      : 'No time limit',
-                  style: TextStyle(color: AppColors.textSecondary(isDark)),
-                ),
-                value: _timerEnabled,
-                onChanged: (val) => setState(() {
-                  _timerEnabled = val;
-                  if (val) _timerMinutes = 10; // default
-                }),
-                activeTrackColor: AppColors.primary,
-              ),
-              if (_timerEnabled) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [5, 10, 15].map((mins) {
-                    final isSelected = _timerMinutes == mins;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _timerMinutes = mins),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.blue.withValues(alpha: 0.2)
-                                : AppColors.surf(isDark).withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected ? Colors.blue : AppColors.border(isDark),
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.timer, size: 22),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$mins min',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected ? Colors.blue : AppColors.textPrimary(isDark),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList()
-                    ..add(
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: _showCustomTimePicker,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            decoration: BoxDecoration(
-                              color: (_timerMinutes != null && ![5, 10, 15].contains(_timerMinutes))
-                                  ? Colors.blue.withValues(alpha: 0.2)
-                                  : AppColors.surf(isDark).withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.border(isDark),
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                const Icon(Icons.edit, size: 22),
-                                const SizedBox(height: 6),
-                                Text(
-                                  (_timerMinutes != null &&
-                                      ![5, 10, 15].contains(_timerMinutes))
-                                      ? '$_timerMinutes min'
-                                      : 'Custom',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ),
-              ],
-            ],
-            const SizedBox(height: 40),
-            // Start button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                onPressed: _startDebate,
-                child: Text(
-                  widget.mode == DebateMode.learning
-                      ? 'Start Learning Session 📚'
-                      : 'Start Debate 🔥',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRulesPanel(bool isDark, bool isWideDesktop) {
-    return Padding(
-      padding: isWideDesktop
-          ? const EdgeInsets.fromLTRB(32, 48, 32, 32)
-          : const EdgeInsets.all(32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Rules & Guidelines',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary(isDark),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _RuleItem(
-            isDark: isDark,
-            icon: Icons.rule,
-            title: 'Respectful Debate',
-            description: 'Keep arguments civil and focused on facts, not personal attacks.',
-          ),
-          const SizedBox(height: 16),
-          _RuleItem(
-            isDark: isDark,
-            icon: Icons.schedule,
-            title: 'Time Management',
-            description: 'Use your time wisely. Think before you type for better responses.',
-          ),
-          const SizedBox(height: 16),
-          _RuleItem(
-            isDark: isDark,
-            icon: Icons.psychology,
-            title: 'AI Behavior',
-            description: 'The AI will match your selected difficulty and challenge your stance.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCustomTimePicker() {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Custom Timer'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: 'Enter minutes (1-60)',
-            suffixText: 'minutes',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final mins = int.tryParse(ctrl.text);
-              if (mins != null && mins >= 1 && mins <= 60) {
-                setState(() => _timerMinutes = mins);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Set'),
-          ),
-        ],
-      ),
-    );
+  void _toggleTimer(bool on) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _timerEnabled = on;
+      if (on) _timerMinutes = 10; // default
+    });
   }
 
   void _startDebate() {
@@ -751,16 +64,412 @@ class _DebateSetupScreenState extends State<DebateSetupScreen> {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop =
+        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: const SetupBackButton(),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: isDesktop ? _buildDesktop() : _buildColumn(),
+      ),
+    );
+  }
+
+  Widget _buildDesktop() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              flex: 5,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: _buildColumn(),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xxxl),
+            Flexible(
+              flex: 3,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: const _RulesPanel(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColumn() {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gutter,
+              AppSpacing.sm,
+              AppSpacing.gutter,
+              AppSpacing.xxl,
+            ),
+            child: StaggeredColumn(
+              children: [
+                const AppOverline('Step 3 of 3'),
+                const SizedBox(height: AppSpacing.sm),
+                Text('Set the terms', style: context.text.headlineMedium),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _isLearning
+                      ? 'Choose how hard your coach pushes back.'
+                      : 'Choose how hard the opponent pushes and whether the clock runs.',
+                  style: context.text.bodyMedium?.copyWith(
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                _SummaryCard(topic: widget.topic, stance: widget.stance),
+                const SizedBox(height: AppSpacing.xxl),
+                const AppSectionHeader(title: 'Opponent strength'),
+                AppListGroup(
+                  children: [
+                    for (final d in _difficulties)
+                      _DifficultyRow(
+                        name: d.name,
+                        description: d.desc,
+                        selected: _difficulty == d.name,
+                        onTap: () => _selectDifficulty(d.name),
+                      ),
+                  ],
+                ),
+                if (!_isLearning) ...[
+                  const SizedBox(height: AppSpacing.xxl),
+                  const AppSectionHeader(title: 'Timer'),
+                  _TimerCard(
+                    enabled: _timerEnabled,
+                    minutes: _timerMinutes ?? 10,
+                    onToggle: _toggleTimer,
+                    onChanged: (m) => setState(() => _timerMinutes = m),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            AppSpacing.md,
+            AppSpacing.gutter,
+            AppSpacing.gutter,
+          ),
+          child: AppButton.primary(
+            label: _isLearning ? 'Start learning session' : 'Start debate',
+            icon: _isLearning ? AppIcons.learning : AppIcons.play,
+            onPressed: _startDebate,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _RuleItem extends StatelessWidget {
-  final bool isDark;
+/// Topic and stance recap.
+class _SummaryCard extends StatelessWidget {
+  final String topic;
+  final String stance;
+  const _SummaryCard({required this.topic, required this.stance});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard(
+      level: AppCardLevel.raised,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(AppIcons.topic, size: 20, color: c.textSecondary),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  topic,
+                  style: context.text.bodyMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Divider(height: 1, thickness: 1, color: c.border),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Text('Your stance', style: context.text.bodySmall),
+              const Spacer(),
+              AppPill.stance(stance),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One selectable difficulty row inside an [AppListGroup].
+class _DifficultyRow extends StatelessWidget {
+  final String name;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DifficultyRow({
+    required this.name,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final (Color fg, Color bg) = switch (name.trim().toLowerCase()) {
+      'easy' => (c.positiveText, c.positiveBg),
+      'hard' => (c.negativeText, c.negativeBg),
+      _ => (c.warningText, c.warningBg),
+    };
+    final title = name.isEmpty
+        ? name
+        : name[0].toUpperCase() + name.substring(1).toLowerCase();
+
+    return Semantics(
+      selected: selected,
+      child: Pressable(
+        onTap: onTap,
+        pressedScale: 0.99,
+        semanticLabel: title,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              AppIconTile(
+                icon: AppIcons.forDifficulty(name, duotone: true),
+                color: fg,
+                background: bg,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: context.text.titleSmall),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      description,
+                      style: context.text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _RadioMark(selected: selected),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Radio-like trailing indicator: filled check when selected, outline otherwise.
+class _RadioMark extends StatelessWidget {
+  final bool selected;
+  const _RadioMark({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        child: selected
+            ? Icon(
+                AppIcons.checkCircle,
+                key: const ValueKey('on'),
+                size: 22,
+                color: c.accent,
+              )
+            : Center(
+                key: const ValueKey('off'),
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: c.borderStrong, width: 1.5),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Switch row plus, when on, a slider with the minutes in the mono face.
+class _TimerCard extends StatelessWidget {
+  final bool enabled;
+  final int minutes;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<int> onChanged;
+
+  const _TimerCard({
+    required this.enabled,
+    required this.minutes,
+    required this.onToggle,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppIconTile(
+                  icon: AppIcons.timer,
+                  color: enabled ? c.accent : c.textSecondary,
+                  background: enabled ? c.accentSoft : c.surfaceRaised,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Time limit', style: context.text.titleSmall),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        enabled
+                            ? 'The debate ends when the clock runs out'
+                            : 'No time limit',
+                        style: context.text.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Switch(value: enabled, onChanged: onToggle),
+              ],
+            ),
+            if (enabled) ...[
+              const SizedBox(height: AppSpacing.lg),
+              Divider(height: 1, thickness: 1, color: c.border),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('$minutes', style: context.mono(size: 28)),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    minutes == 1 ? 'minute' : 'minutes',
+                    style: context.text.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Slider(
+                value: minutes.toDouble(),
+                min: 1,
+                max: 60,
+                divisions: 59,
+                label: '$minutes min',
+                onChanged: (v) => onChanged(v.round()),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop side panel: ground rules.
+class _RulesPanel extends StatelessWidget {
+  const _RulesPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
+      child: AppReveal(
+        index: 3,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppOverline('Ground rules'),
+            const SizedBox(height: AppSpacing.md),
+            const AppListGroup(
+              children: [
+                _RuleRow(
+                  icon: AppIcons.shield,
+                  title: 'Stay civil',
+                  description: 'Argue the facts, not the person.',
+                ),
+                _RuleRow(
+                  icon: AppIcons.timer,
+                  title: 'Use your time',
+                  description: 'Think before you type; the clock keeps going.',
+                ),
+                _RuleRow(
+                  icon: AppIcons.ai,
+                  title: 'The opponent adapts',
+                  description: 'ClashBot matches the strength you pick and challenges your stance.',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RuleRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
 
-  const _RuleItem({
-    required this.isDark,
+  const _RuleRow({
     required this.icon,
     required this.title,
     required this.description,
@@ -768,42 +477,20 @@ class _RuleItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surf(isDark).withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border(isDark)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: AppColors.primary,
-          ),
-          const SizedBox(width: 12),
+          AppIconTile(icon: icon, size: 40, iconSize: 20),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary(isDark),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: AppColors.textSecondary(isDark),
-                  ),
-                ),
+                Text(title, style: context.text.titleSmall),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(description, style: context.text.bodySmall),
               ],
             ),
           ),

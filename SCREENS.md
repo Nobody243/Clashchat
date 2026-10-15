@@ -7,7 +7,7 @@ This document describes all active user screens in the ClashChat Flutter applica
 ## 1. Splash Screen
 **File:** `lib/screens/splash_screen.dart`
 
-The entry point of the application. Displays the ClashChat logo and a centered Lottie animation (`ChatAi.json`) on a dark background with floating aurora background effects. Once the entry animation completes:
+The entry point of the application. A quiet wordmark reveal: "Clash" in ink, "Chat" in brass, a short brass rule and the tagline "Argue better." Once the reveal completes:
 - It checks `AuthService.isLoggedIn` and validates the user session via `SessionService.isSessionValid()`.
 - If logged in and valid, routes to the **Home Screen**.
 - Otherwise, routes to the **Login Screen**.
@@ -17,10 +17,11 @@ The entry point of the application. Displays the ClashChat logo and a centered L
 ## 2. Login Screen
 **File:** `lib/screens/login_screen.dart`
 
-The authentication hub, styled exclusively in a dark theme. Features an frosted central card containing two tabs:
+The authentication screen. Follows the app theme (light or dark). A left-aligned heading, a Login / Sign up segmented control, labelled fields and a single primary button; on desktop a brand panel sits beside the form. Tabs:
 - **Login**: Email and password fields with a submission button.
 - **Sign Up**: Email, password, and display name fields.
-- **Social Sign-In**: Integrated Google Sign-In buttons styled consistently with dark semi-transparent borders.
+- **Social Sign-In**: a secondary "Continue with Google" button.
+- **Forgot password**: sends a Firebase reset email to the address in the email field.
 Upon successful auth, routes to the **Home Screen**.
 
 ---
@@ -35,10 +36,10 @@ The primary navigation shell of the application. It contains a bottom navigation
 - **Settings**: App preferences and appearance.
 
 The core **Home Dashboard** contains:
-- **Hero Card** (`_HeroCard`): Shows the current user name and circular Dicebear avatar.
-- **Rank Badge** (`RankBadgeWidget`): Displays current rank points and competitive title (e.g. Newcomer, Debater, Orator, Grandmaster).
-- **Usage Card** (`_UsageCard`): Tracks the user's daily quota slots of 40 debates (restricting new games once exhausted).
-- **Game Modes**: Three cards routing to the start of a debate:
+- **Header**: time-of-day greeting, display name and the Dicebear avatar ringed in the rank color.
+- **Rank card**: rank icon, title, points (monospace) and progress to the next rank.
+- **Usage card**: debates used today out of the daily quota of 40, with a progress bar and a lock state.
+- **Game Modes**: one grouped list with three rows routing to the start of a debate:
   1. **Casual Mode**: Free practice with custom difficulty and timer constraints.
   2. **Ranked Mode**: Competitive match with points on the line, difficulty matched to user rank, and fixed 10-minute timers.
   3. **Learning Mode**: Coached mode providing constructive real-time debate analysis.
@@ -49,7 +50,7 @@ The core **Home Dashboard** contains:
 **File:** `lib/screens/topic_screen.dart`
 
 First step in setting up a debate. Users choose a category or input a custom topic:
-- Displays 8 preset categories (Technology, Education, Society, Health, Politics, Environment, Economy, Culture) as responsive selectable cards.
+- Displays 8 preset categories (Technology, Education, Society, Health, Politics, Environment, Economy, Culture) as a grid of selectable icon cards.
 - Provides a custom text input field.
 - Navigates to the **Stance Screen** on confirmation.
 
@@ -59,7 +60,7 @@ First step in setting up a debate. Users choose a category or input a custom top
 **File:** `lib/screens/stance_screen.dart`
 
 Second step in setup. Users select their argument stance:
-- A segmented control allowing the selection of **For** or **Against**.
+- Two large selectable cards, **For** (sage) and **Against** (terracotta).
 - **Routing Logic**:
   - **Learning Mode**: Navigates directly to the **Chat Screen** (with "Adaptable" difficulty).
   - **Casual Mode**: Pushes to the **Debate Setup Screen**.
@@ -71,7 +72,7 @@ Second step in setup. Users select their argument stance:
 **File:** `lib/screens/debate_setup_screen.dart`
 
 Casual Mode setup. Allows players to configure details of their practice session:
-- **Difficulty Selection**: Cards for Easy (🌱), Medium (⚔️), and Hard (🔥).
+- **Difficulty Selection**: a grouped list of Easy, Medium and Hard rows with radio-style selection.
 - **Timer Switch**: Toggle to enable a custom debate timer with a minutes slider.
 Tapping the action button launches the **Chat Screen**.
 
@@ -81,7 +82,7 @@ Tapping the action button launches the **Chat Screen**.
 **File:** `lib/screens/ranked_setup_screen.dart`
 
 Ranked Mode preview. Displays competitive matchmaking parameters:
-- Displays current matchmaking details (opponent search status, fixed 10-minute timer constraint, and automatic difficulty matching the player's current rank).
+- States plainly that the opponent is calibrated to the player's current rank (no fake matchmaking), lists the fixed rules (10-minute timer, difficulty, topic, stance)
 - Previews competitive points on the line.
 Tapping start launches the **Chat Screen**.
 
@@ -92,7 +93,7 @@ Tapping start launches the **Chat Screen**.
 
 The interactive debate interface:
 - **App Bar**: Displays topic, current stance badge, and remaining timer.
-- **Message List**: Bubbles slide in on entry. User messages are right-aligned with a purple-to-gold gradient; AI replies are left-aligned on surface colors.
+- **Message List**: user messages are right-aligned brass bubbles; AI replies are left-aligned raised-surface bubbles. Timestamps appear once per run of messages.
 - **Typing Indicator**: Shows bouncing dots while the AI endpoint processes.
 - **Learning Mode**: Underneath the AI counter-argument, a separate card highlights the AI debate coach's tips and feedback on the user's last message.
 Tapping **"End"** in the app bar triggers the final scoring and routes to the **Results Screen**.
@@ -103,10 +104,10 @@ Tapping **"End"** in the app bar triggers the final scoring and routes to the **
 **File:** `lib/screens/results_screen.dart`
 
 The review page displayed after scoring completes:
-- **Score Arc**: A circular gradient progress indicator painting the final debate score (0-100).
-- **Stat Cards**: Displays messages exchanged, final score, and stance.
-- **Feedback Lists**: Separate bulleted cards highlighting strengths and weaknesses/areas to improve.
-- **Actions**: Double gradient buttons to "Debate Again" or return "Home".
+- **Score Ring**: a brass ring with the score in monospace, animated from zero.
+- **Stat Cards**: messages exchanged, duration and difficulty.
+- **Feedback Lists**: "What worked" and "What to sharpen" as hairline-divided rows, plus a collapsible transcript.
+- **Actions**: a primary "Debate again" and a secondary "Back to home" button.
 
 ---
 

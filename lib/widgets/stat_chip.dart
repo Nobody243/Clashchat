@@ -1,13 +1,13 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
 
+import '../ui/ui.dart';
+
+/// Compact stat: a small icon tile and a label on a raised surface.
 class StatChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color? iconColor;
+
   const StatChip({
     super.key,
     required this.label,
@@ -17,48 +17,35 @@ class StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    final ic = iconColor ?? AppColors.primary;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    final c = context.colors;
+    final ic = iconColor ?? c.accent;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : const Color(0xFFE4DFF5),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.25)
-                : ic.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: c.surfaceRaised,
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: c.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: ic.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: ic, size: 14),
+          AppIconTile(
+            icon: icon,
+            color: ic,
+            background: ic.withValues(alpha: 0.12),
+            size: 24,
+            iconSize: 14,
+            radius: AppRadius.smAll,
           ),
-          const SizedBox(width: 8),
+          AppSpacing.hSm,
           Text(
             label,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary(isDark),
-            ),
+            style: context.text.labelMedium?.copyWith(color: c.textSecondary),
           ),
         ],
       ),

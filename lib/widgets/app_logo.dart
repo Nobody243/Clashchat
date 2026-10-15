@@ -1,150 +1,120 @@
 import 'package:flutter/material.dart';
 
-class AppLogoWidget extends StatelessWidget {
-  final double size;
-  final bool showBackground;
+import '../ui/ui.dart';
 
+/// The ClashChat mark: two speech bubbles meeting, one outlined in ink and
+/// one filled in brass. Reads at 20 px and at 1024 px.
+///
+/// Colors come from the current theme so the mark sits correctly on both
+/// canvases. [showBackground] draws the rounded app-icon tile behind it.
+class AppLogoWidget extends StatelessWidget {
   const AppLogoWidget({
     super.key,
     this.size = 72.0,
     this.showBackground = false,
   });
 
+  final double size;
+  final bool showBackground;
+
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: AppLogoPainter(showBackground: showBackground),
+    final c = context.colors;
+    return Semantics(
+      label: 'ClashChat',
+      image: true,
+      child: CustomPaint(
+        size: Size(size, size),
+        painter: AppLogoPainter(
+          showBackground: showBackground,
+          ink: c.textPrimary,
+          accent: c.accent,
+          background: c.background,
+        ),
+      ),
     );
   }
 }
 
+/// Paints the mark in a 160 x 160 coordinate space, scaled to the given size.
+///
+/// Colors default to the dark palette so the painter can be used headless
+/// (for example when rasterising the launcher icon).
 class AppLogoPainter extends CustomPainter {
-  final bool showBackground;
+  AppLogoPainter({
+    this.showBackground = false,
+    Color? ink,
+    Color? accent,
+    Color? background,
+  })  : ink = ink ?? AppColorsExt.dark.textPrimary,
+        accent = accent ?? AppColorsExt.dark.accent,
+        background = background ?? AppColorsExt.dark.background;
 
-  AppLogoPainter({this.showBackground = false});
+  final bool showBackground;
+  final Color ink;
+  final Color accent;
+  final Color background;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Coordinate system matches viewBox="0 0 160 160"
-    final double scale = size.width / 160.0;
+    final scale = size.width / 160.0;
     canvas.scale(scale, scale);
 
     if (showBackground) {
-      final RRect bgRect = RRect.fromRectAndRadius(
-        const Rect.fromLTWH(0, 0, 160, 160),
-        const Radius.circular(36),
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(0, 0, 160, 160),
+          const Radius.circular(36),
+        ),
+        Paint()..color = background,
       );
-      canvas.drawRRect(bgRect, Paint()..color = const Color(0xFF0e0e18));
     }
 
-    // ── LEFT SIDE ──
-    canvas.save();
-    canvas.clipRect(const Rect.fromLTWH(0, 0, 80, 160));
+    const radius = Radius.circular(18);
 
-    // Base circle
-    canvas.drawCircle(
-      const Offset(80, 80),
-      50,
-      Paint()..color = const Color(0xFF3C3489),
+    final back = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(28, 36, 80, 60),
+      radius,
     );
-
-    // Eye elements
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(58, 70), width: 18, height: 22),
-      Paint()..color = const Color(0xFFCECBF6),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(58, 69), width: 10, height: 12),
-      Paint()..color = const Color(0xFF26215C),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(59, 68), width: 4, height: 5),
-      Paint()..color = const Color(0xFFEEEDFE),
+    final front = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(56, 68, 76, 56),
+      radius,
     );
 
-    // Smile
-    final pathL = Path()
-      ..moveTo(46, 94)
-      ..quadraticBezierTo(58, 102, 70, 94);
-    canvas.drawPath(
-      pathL,
+    // Without a tile the gap between the bubbles must be transparent, so the
+    // mark is composed in its own layer and the gap is cleared there.
+    if (!showBackground) {
+      canvas.saveLayer(const Rect.fromLTWH(0, 0, 160, 160), Paint());
+    }
+
+    // Back bubble: ink outline.
+    canvas.drawRRect(
+      back,
       Paint()
-        ..color = const Color(0xFFCECBF6)
+        ..color = ink
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round,
+        ..strokeWidth = 8
+        ..strokeJoin = StrokeJoin.round,
     );
 
-    // Top line (relaxed eyebrow)
-    canvas.drawLine(
-      const Offset(46, 56),
-      const Offset(70, 60),
-      Paint()
-        ..color = const Color(0xFFAFA9EC)
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round,
+    // Gap so the front bubble reads as sitting in front of the outline.
+    canvas.drawRRect(
+      front.inflate(8),
+      showBackground
+          ? (Paint()..color = background)
+          : (Paint()..blendMode = BlendMode.clear),
     );
 
-    canvas.restore();
+    // Front bubble: brass fill.
+    canvas.drawRRect(front, Paint()..color = accent);
 
-    // ── RIGHT SIDE ──
-    canvas.save();
-    canvas.clipRect(const Rect.fromLTWH(80, 0, 80, 160));
-
-    // Base circle
-    canvas.drawCircle(
-      const Offset(80, 80),
-      50,
-      Paint()..color = const Color(0xFF0F6E56),
-    );
-
-    // Eye elements
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(102, 70), width: 18, height: 22),
-      Paint()..color = const Color(0xFF9FE1CB),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(102, 69), width: 10, height: 12),
-      Paint()..color = const Color(0xFF04342C),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: const Offset(103, 68), width: 4, height: 5),
-      Paint()..color = const Color(0xFFE1F5EE),
-    );
-
-    // Frown
-    final pathR = Path()
-      ..moveTo(90, 98)
-      ..quadraticBezierTo(102, 90, 114, 98);
-    canvas.drawPath(
-      pathR,
-      Paint()
-        ..color = const Color(0xFF9FE1CB)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round,
-    );
-
-    // Top line (angry eyebrow)
-    canvas.drawLine(
-      const Offset(90, 62),
-      const Offset(114, 56),
-      Paint()
-        ..color = const Color(0xFF5DCAA5)
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round,
-    );
-
-    canvas.restore();
-
-    // ── CENTER DIVIDER ──
-    canvas.drawRect(
-      const Rect.fromLTWH(77, 22, 6, 116),
-      Paint()..color = const Color(0xFF0a0a0f),
-    );
+    if (!showBackground) canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant AppLogoPainter old) =>
+      old.showBackground != showBackground ||
+      old.ink != ink ||
+      old.accent != accent ||
+      old.background != background;
 }

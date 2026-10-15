@@ -1,5 +1,5 @@
 name: clashchat
-description: "A new Flutter project."
+description: "ClashChat – debate an AI opponent in casual, ranked and coached modes."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -44,21 +44,13 @@ dependencies:
   http: ^1.1.0
 
   # Storage & Utils
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   flutter_dotenv: ^5.2.1
-  uuid: ^4.4.0
 
   # Animations & UI
-  lottie: ^3.1.2
   google_fonts: ^6.2.1
   google_sign_in: ^6.2.1
   flutter_animate: ^4.5.0
   flutter_svg: ^2.0.10+1
-
-  # Chat UI
-  flutter_chat_ui: ^1.6.15
-  flutter_chat_types: ^3.6.2
 
   # State management
   provider: ^6.1.2
@@ -66,7 +58,7 @@ dependencies:
   # Utilities
   intl: ^0.19.0
   shared_preferences: ^2.2.3
-
+  lucide_icons_flutter: ^3.1.25
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -92,7 +84,6 @@ flutter:
 
   assets:
     - env
-    - assets/lottie/
     - assets/google_icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see

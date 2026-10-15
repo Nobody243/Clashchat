@@ -1,73 +1,65 @@
 import 'package:flutter/material.dart';
 
+/// Brand and seed constants. See DESIGN.md.
+///
+/// Anything that changes with the theme (text, surfaces, borders, pills) lives
+/// in [AppColorsExt] and is read via `context.colors`. Constants here are for
+/// values that are the same in both themes (rank colors, brand seeds) and for
+/// seeding the dark/light extension values.
 abstract final class AppColors {
-  // ──── Brand — Royal Purple + Gold ────
-  static const Color primary = Color(0xFF7B4FA6); // Royal Purple
-  static const Color primaryLight = Color(0xFF9D6DC4); // Soft Lavender
-  static const Color secondary = Color(0xFF3D7DD8); // Refined Blue
-  static const Color gold = Color(0xFFC49A3C); // Luxury Gold
+  // ──── Brand ────
+  /// The one accent. Trophies, CTAs (dark), active states.
+  static const Color brass = Color(0xFFD4A84B);
+  /// Brass darkened for text/icons on light surfaces (passes 4.5:1 on white).
+  static const Color brassDeep = Color(0xFF9A7520);
+  static const Color brassLight = Color(0xFFE2BE6B);
+  /// Warm near-black used for primary buttons in light mode.
+  static const Color ink = Color(0xFF1A1719);
+  /// Warm paper used for light canvas and text on ink.
+  static const Color paper = Color(0xFFF6F4F0);
 
-  // ──── Semantic ────
-  static const Color success = Color(0xFF2A7A4F);
-  static const Color successAlt = Color(0xFF38A169);
-  static const Color warning = Color(0xFFD4891A);
-  static const Color error = Color(0xFFC0392B);
-  static const Color errorAlt = Color(0xFFE53E3E);
+  // ──── Semantic hues (dark-theme strength) ────
+  static const Color sage = Color(0xFF6FC29B); // for / success / easy
+  static const Color terracotta = Color(0xFFED8B72); // against / error / hard
+  static const Color amber = Color(0xFFE2B45C); // warning / medium / points
+  static const Color sky = Color(0xFF86B0E3); // info / learning
 
-  // ──── Dark Theme — Deep Midnight ────
-  static const Color background = Color(0xFF0C0B10);
-  static const Color surface = Color(0xFF14121C);
-  static const Color surfaceDeep = Color(0xFF1C192A);
+  // ──── Dark neutrals ("Arena Night") ────
+  static const Color canvasDark = Color(0xFF121113);
+  static const Color surfaceDark = Color(0xFF1A181B);
+  static const Color surfaceRaisedDark = Color(0xFF232025);
+  static const Color insetDark = Color(0xFF0D0C0E);
 
-  // ──── Light Theme — Luxury Ivory White ────
-  static const Color backgroundLight = Color(0xFFF8F7FF); // Soft lavender white
+  // ──── Light neutrals ("Arena Day") ────
+  static const Color canvasLight = Color(0xFFF6F4F0);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDeepLight = Color(
-    0xFFF0ECFB,
-  ); // Light lavender tint
+  static const Color insetLight = Color(0xFFEDE9E2);
 
-  // ──── Adaptive Helpers ────
-  static Color bg(bool isDark) => isDark ? background : backgroundLight;
-  static Color surf(bool isDark) => isDark ? surface : surfaceLight;
-  static Color surfDeep(bool isDark) => isDark ? surfaceDeep : surfaceDeepLight;
-  static Color textPrimary(bool isDark) =>
-      isDark ? Colors.white : const Color(0xFF1C1823);
-  static Color textSecondary(bool isDark) =>
-      isDark ? Colors.white70 : const Color(0xFF4A4265);
-  static Color textHint(bool isDark) =>
-      isDark ? Colors.white38 : const Color(0xFF9A94B8);
-  static Color border(bool isDark) =>
-      isDark ? const Color(0x1AFFFFFF) : const Color(0xFFE4DFF5);
+  // ──── Rank colors (same in both themes) ────
+  static const Color rankNewcomer = Color(0xFF8E8A85); // stone
+  static const Color rankChallenger = Color(0xFFB5793F); // bronze
+  static const Color rankDebater = Color(0xFFA9B0BA); // silver
+  static const Color rankOrator = Color(0xFFD4A84B); // brass
+  static const Color rankGrandmaster = Color(0xFFCFE3F0); // ice
 
-  // ──── History Screen Colors ────
-  static const Color historyBg = Color(0xFF0D0D0F);
-  static const Color historySurface = Color(0xFF1A1A1F);
-  static const Color historyCardBg = Color(0xFF16161A);
-  static const Color historyBorder = Color(0xFF2A2A2E);
-  static const Color historyTextTopic = Color(0xFFE8E8EC);
-  static const Color historyTextMuted = Color(0xFF555555);
-
-  static const Color rankedTabBg = Color(0xFF3C3489);
-  static const Color rankedTabText = Color(0xFFCECBF6);
-  static const Color casualTabBg = Color(0xFF085041);
-  static const Color casualTabText = Color(0xFF9FE1CB);
-
-  static const Color accentGreen = Color(0xFF1D9E75);
-  static const Color accentRed = Color(0xFFE24B4A);
-  static const Color accentAmber = Color(0xFFEF9F27);
-
-  static const Color pillPositiveBg = Color(0xFF04342C);
-  static const Color pillPositiveText = Color(0xFF5DCAA5);
-  static const Color pillNegativeBg = Color(0xFF501313);
-  static const Color pillNegativeText = Color(0xFFF09595);
-
-  static const Color pillRankBg = Color(0xFF26215C);
-  static const Color pillRankText = Color(0xFFAFA9EC);
-
-  static const Color pillEasyBg = Color(0xFF173404);
-  static const Color pillEasyText = Color(0xFF97C459);
-  static const Color pillMediumBg = Color(0xFF412402);
-  static const Color pillMediumText = Color(0xFFEF9F27);
-  static const Color pillHardBg = Color(0xFF501313);
-  static const Color pillHardText = Color(0xFFF09595);
+  // ──── Legacy aliases ────
+  // Kept so existing call sites compile while screens are restyled. New code
+  // must use `context.colors.*`. These will be removed.
+  static const Color primary = brass;
+  static const Color primaryLight = brassLight;
+  static const Color secondary = sky;
+  static const Color gold = brass;
+  static const Color success = sage;
+  static const Color successAlt = sage;
+  static const Color warning = amber;
+  static const Color error = terracotta;
+  static const Color errorAlt = terracotta;
+  static const Color background = canvasDark;
+  static const Color surface = surfaceDark;
+  static const Color surfaceDeep = surfaceRaisedDark;
+  static const Color backgroundLight = canvasLight;
+  static const Color surfaceDeepLight = insetLight;
+  static const Color accentGreen = sage;
+  static const Color accentRed = terracotta;
+  static const Color accentAmber = amber;
 }

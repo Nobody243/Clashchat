@@ -1,51 +1,79 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../core/app_colors.dart';
-import '../core/theme_provider.dart';
 
+import '../ui/ui.dart';
+
+/// Section header plus a hairline-divided list of feedback points.
+///
+/// [color] tints the per-row icon (pass `context.colors.positiveText` /
+/// `warningText`). [backgroundColor] is accepted for source compatibility and
+/// ignored; rows always sit on the surface. When [points] is empty the section
+/// renders a compact [AppEmptyState] if [emptyTitle] is given, otherwise
+/// nothing.
 class FeedbackSection extends StatelessWidget {
   final String title;
   final List<String> points;
   final IconData icon;
   final Color color;
-  const FeedbackSection({super.key, required this.title, required this.points, required this.icon, required this.color});
+  final Color? backgroundColor;
+  final String? emptyTitle;
+  final String? emptyMessage;
+
+  const FeedbackSection({
+    super.key,
+    required this.title,
+    required this.points,
+    required this.icon,
+    required this.color,
+    this.backgroundColor,
+    this.emptyTitle,
+    this.emptyMessage,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<ThemeProvider>().isDark;
-    if (points.isEmpty) return const SizedBox.shrink();
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surf(isDark),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 14, color: color)),
-          ]),
-          const SizedBox(height: 10),
-          ...points.map((p) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(width: 5, height: 5, margin: const EdgeInsets.only(top: 7, right: 10),
-                    decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                Expanded(child: Text(p, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary(isDark), height: 1.4))),
-              ],
+    final text = context.text;
+
+    if (points.isEmpty && emptyTitle == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppSectionHeader(title: title),
+        if (points.isEmpty)
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: AppEmptyState(
+              compact: true,
+              icon: icon,
+              title: emptyTitle!,
+              message: emptyMessage,
             ),
-          )),
-        ],
-      ),
+          )
+        else
+          AppListGroup(
+            children: [
+              for (final p in points)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md + 2,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(icon, size: 18, color: color),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(child: Text(p, style: text.bodyMedium)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

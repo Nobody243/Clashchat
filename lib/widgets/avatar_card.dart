@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../models/avatar_option.dart';
 
+import '../models/avatar_option.dart';
+import '../ui/ui.dart';
+
+/// Selectable avatar tile for the picker grid. The selected card gets an
+/// accent border and a small check in the top-right corner.
 class AvatarCard extends StatelessWidget {
   final AvatarOption avatar;
   final bool isSelected;
@@ -16,58 +20,52 @@ class AvatarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
-
-    return GestureDetector(
+    final c = context.colors;
+    return AppCard(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 3,
-          ),
-          boxShadow: isSelected
-              ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
-              : [],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Stack(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      borderColor: isSelected ? c.accent : null,
+      child: Stack(
+        children: [
+          Column(
             children: [
-              SvgPicture.network(
-                avatar.url,
-                width: 80,
-                height: 80,
-                placeholderBuilder: (_) => const SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
+              Expanded(
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      final side = box.biggest.shortestSide;
+                      return ClipOval(
+                        child: SvgPicture.network(
+                          avatar.url,
+                          width: side,
+                          height: side,
+                          fit: BoxFit.cover,
+                          placeholderBuilder: (_) =>
+                              AppSkeleton.circle(size: side),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-              if (isSelected)
-                Positioned(
-                  bottom: 4,
-                  right: 4,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      size: 12,
-                      color: Colors.white,
-                    ),
-                  ),
+              AppSpacing.vSm,
+              Text(
+                avatar.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.labelMedium?.copyWith(
+                  color: isSelected ? c.textPrimary : c.textSecondary,
                 ),
+              ),
             ],
           ),
-        ),
+          if (isSelected)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Icon(AppIcons.checkCircle, size: 18, color: c.accent),
+            ),
+        ],
       ),
     );
   }

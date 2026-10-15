@@ -15,6 +15,15 @@ service cloud.firestore {
       return (value is int) && value >= min && value <= max;
     }
 
+    // Bounds a rankPoints write to a single debate's possible delta.
+    function isValidRankPointsUpdate() {
+      let next = request.resource.data.rankPoints;
+      let prev = ('rankPoints' in resource.data) ? resource.data.rankPoints : 0;
+      return (next is int) && next >= 0
+        && (next - prev) <= 50
+        && (prev - next) <= 20;
+    }
+
     // ── USERS COLLECTION ──
     // Public read for authenticated users is allowed, but writes are strictly
     // limited to the owner and validated to prevent client-side tampering of
@@ -24,14 +33,24 @@ service cloud.firestore {
 
       allow create: if isOwner(userId)
         // Require that created user email (if present) matches auth token email
-        && ( !('email' in request.resource.data) || request.resource.data.email == request.auth.token.email );
+        && ( !('email' in request.resource.data) || request.resource.data.email == request.auth.token.email )
+        // New accounts always start at zero rank points
+        && ( !('rankPoints' in request.resource.data) || request.resource.data.rankPoints == 0 );
 
       allow update: if isOwner(userId)
+        // Identity fields are immutable after creation
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email', 'role', 'createdAt'])
+        // Rank points: must be a non-negative int and may only move by at most one
+        // debate's worth per write (+50 best win, -20 worst loss). This caps client-side
+        // tampering until point awards move server-side.
+        && ( !('rankPoints' in request.resource.data) || isValidRankPointsUpdate() )
         // If quota limits are present, validate ranges
         && ( !('dailyUsageLimit' in request.resource.data) || isIntInRange(request.resource.data.dailyUsageLimit, 1, 10000) )
         && ( !('dailyUsageUsed' in request.resource.data) || (request.resource.data.dailyUsageUsed is int && request.resource.data.dailyUsageUsed >= 0 && request.resource.data.dailyUsageUsed <= (('dailyUsageLimit' in request.resource.data) ? request.resource.data.dailyUsageLimit : 10000)) )
         // Basic type checks for commonly used fields
         && ( !('avatarSeed' in request.resource.data) || request.resource.data.avatarSeed is string )
+        && ( !('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 60) )
+        && ( !('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 300) )
         && ( !('isGoogleSignIn' in request.resource.data) || request.resource.data.isGoogleSignIn is bool );
 
       allow delete: if isOwner(userId);

@@ -1,42 +1,24 @@
-import 'dart:math' as math;
-// 'dart:ui' is unnecessary; symbols available via material.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'home_screen.dart';
+import '../core/responsive_layout.dart';
 import '../services/auth_service.dart';
 import '../services/session_service.dart';
+import '../ui/ui.dart';
 import '../widgets/app_logo.dart';
+import 'home_screen.dart';
 
-//
-// Palette  always dark, immune to app ThemeData
-//
-const _kBg = Color(0xFF0a0a0f);
-const _kBorder = Color(0x33FFFFFF);
-const _kHint = Color(0x80FFFFFF);
-const _kSubtle = Color(0xB3FFFFFF);
-const _kPurple = Color(0xFF7B4FA6);
-const _kIndigo = Color(0xFF3D4ECA);
-const _kGold = Color(0xFFC49A3C);
-const _kCyan = Color(0xFF00D2FF);
-
-//
-// LOGIN SCREEN
-//
+/// Sign in / sign up. Calm and editorial: wordmark, one headline, a
+/// segmented control, labelled fields and a single primary action.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   int _tab = 0;
-  bool _obscureLogin = true;
-  bool _obscureSignup = true;
   bool _isLoading = false;
 
   final _loginEmail = TextEditingController();
@@ -45,71 +27,10 @@ class _LoginScreenState extends State<LoginScreen>
   final _signupEmail = TextEditingController();
   final _signupPass = TextEditingController();
 
-  // Background blobs
-  late final AnimationController _blob1;
-  late final AnimationController _blob2;
-  late final AnimationController _blob3;
-  // Stars / particles
-  late final AnimationController _stars;
-  // Orbital ring spin
-  late final AnimationController _ring;
-  // Card gentle float
-  late final AnimationController _float;
-  // Logo pulse glow
-  late final AnimationController _glow;
-
-  late final List<_Star> _starList;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _blob1 = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 9),
-    )..repeat(reverse: true);
-    _blob2 = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 13),
-    )..repeat(reverse: true);
-    _blob3 = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 17),
-    )..repeat(reverse: true);
-
-    _stars = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-
-    _ring = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )..repeat();
-
-    _float = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
-
-    _glow = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-
-    final rng = math.Random(42);
-    _starList = List.generate(60, (i) => _Star(rng));
-  }
+  bool get _isSignup => _tab == 1;
 
   @override
   void dispose() {
-    _blob1.dispose();
-    _blob2.dispose();
-    _blob3.dispose();
-    _stars.dispose();
-    _ring.dispose();
-    _float.dispose();
-    _glow.dispose();
     _loginEmail.dispose();
     _loginPass.dispose();
     _signupName.dispose();
@@ -118,6 +39,8 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  // ── Auth handlers (unchanged behaviour) ──
+
   Future<void> _handleLogin() async {
     if (_isLoading) return;
 
@@ -125,10 +48,7 @@ class _LoginScreenState extends State<LoginScreen>
     final pass = _loginPass.text;
     if (email.isEmpty || pass.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email and password'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('Please enter your email and password')),
       );
       return;
     }
@@ -149,14 +69,14 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error), backgroundColor: Colors.red),
+          SnackBar(content: Text(error)),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Login failed: $e')),
         );
       }
     }
@@ -170,10 +90,7 @@ class _LoginScreenState extends State<LoginScreen>
         _signupPass.text.trim().isEmpty ||
         _signupName.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields'),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
@@ -212,29 +129,13 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         setState(() => _isLoading = false);
         if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => _ThemedDialog(
-              title: 'Signup Failed',
-              content: error,
-              actions: [('OK', null)],
-            ),
-          );
+          _showErrorDialog(title: 'Signup failed', message: error);
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => _ThemedDialog(
-            title: 'Signup Failed',
-            content: e.toString(),
-            actions: [('OK', null)],
-          ),
-        );
+        _showErrorDialog(title: 'Signup failed', message: e.toString());
       }
     }
   }
@@ -258,1046 +159,160 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign in failed. Try again.'),
-          ),
+          const SnackBar(content: Text('Google sign in failed. Try again.')),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google sign in error: $e'),
-          ),
+          SnackBar(content: Text('Google sign in error: $e')),
         );
       }
     }
   }
 
+  void _showErrorDialog({required String title, required String message}) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          AppButton.primary(
+            label: 'OK',
+            size: AppButtonSize.small,
+            expand: false,
+            onPressed: () => Navigator.of(dialogContext).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _switchTab(int i) {
+    if (i != _tab && !_isLoading) setState(() => _tab = i);
+  }
+
+  void _submit() {
+    if (_isSignup) {
+      _handleSignup();
+    } else {
+      _handleLogin();
+    }
+  }
+
+  // ── Build ──
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width > ResponsiveLayout.desktopBreakpoint;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Theme(
-        data: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: _kBg,
-          canvasColor: _kBg,
-          colorScheme: ColorScheme.dark(
-            surface: _kBg,
-            onSurface: Colors.white,
-            primary: _kPurple,
-            onPrimary: Colors.white,
-            secondary: _kIndigo,
-            tertiary: _kGold,
-          ),
-        ),
-        child: Scaffold(
-          backgroundColor: _kBg,
-          resizeToAvoidBottomInset: true,
-          body: Stack(
-            children: [
-              //  Layer 1: aurora blobs
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([_blob1, _blob2, _blob3]),
-                  builder: (_, _) => CustomPaint(
-                    painter: _BackgroundPainter(
-                      t1: _blob1.value,
-                      t2: _blob2.value,
-                      t3: _blob3.value,
-                    ),
-                  ),
-                ),
-              ),
+      value: Theme.of(context).appBarTheme.systemOverlayStyle ??
+          SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: context.colors.background,
+        resizeToAvoidBottomInset: true,
+        body: isDesktop ? _buildDesktop(context) : _buildPhone(context),
+      ),
+    );
+  }
 
-              //  Layer 2: star field
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _stars,
-                  builder: (_, _) => CustomPaint(
-                    painter: _StarPainter(t: _stars.value, stars: _starList),
-                  ),
-                ),
-              ),
-
-              //  Layer 3: dark tint overlay (no BackdropFilter — breaks on web)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: Color(
-                    0x66000000,
-                  ), // 40% black tint keeps background dark
-                ),
-              ),
-
-              //  Layer 4: orbiting ring behind the card
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedBuilder(
-                    animation: _ring,
-                    builder: (_, _) =>
-                        CustomPaint(painter: _RingPainter(t: _ring.value)),
-                  ),
-                ),
-              ),
-
-              //  Layer 5: auth card (floating)
-              SafeArea(
-                child: AnimatedBuilder(
-                  animation: _float,
-                  builder: (_, child) {
-                    //final dy = math.sin(_float.value * math.pi) * 6.0;
-                    final tiltY = math.sin(_float.value * math.pi) * 0.03;
-                    return Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.0008)
-                        ..rotateX(tiltY),
-                      child: child,
-                    );
-                  },
-                  child: Transform.translate(
-                    offset: Offset.zero,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 32,
-                          ),
-                          child: _AuthCard(
-                            tab: _tab,
-                            isLoading: _isLoading,
-                            onSwitchTab: (i) {
-                              if (i != _tab && !_isLoading) setState(() => _tab = i);
-                            },
-                            loginEmail: _loginEmail,
-                            loginPass: _loginPass,
-                            obscureLogin: _obscureLogin,
-                            onToggleLogin: () =>
-                                setState(() => _obscureLogin = !_obscureLogin),
-                            signupName: _signupName,
-                            signupEmail: _signupEmail,
-                            signupPass: _signupPass,
-                            obscureSignup: _obscureSignup,
-                            onToggleSignup: () =>
-                                setState(() => _obscureSignup = !_obscureSignup),
-                            onLoginTap: _handleLogin,
-                            onSignupTap: _handleSignup,
-                            onGoogleSignInTap: _handleGoogleSignIn,
-                            glowAnim: _glow,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+  Future<void> _forgotPassword() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await AuthService.sendPasswordReset(_loginEmail.text);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error ??
+              'If an account exists for that email, a reset link is on its way.',
         ),
       ),
     );
   }
-}
 
-//
-// Background aurora painter
-//
-class _BackgroundPainter extends CustomPainter {
-  final double t1, t2, t3;
-  const _BackgroundPainter({
-    required this.t1,
-    required this.t2,
-    required this.t3,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = _kBg,
-    );
-
-    void blob(double t, Color color, Alignment a, Alignment b, double radius) {
-      final lerped = Alignment.lerp(a, b, _ease(t))!;
-      final cx = size.width * ((lerped.x + 1) / 2);
-      final cy = size.height * ((lerped.y + 1) / 2);
-      final r = math.min(size.width, size.height) * radius;
-      canvas.drawCircle(
-        Offset(cx, cy),
-        r,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              color.withValues(alpha: 0.75),
-              color.withValues(alpha: 0.0),
-            ],
-          ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r)),
-      );
-    }
-
-    // Single subtle purple radial glow top-center
-    blob(
-      t1,
-      _kPurple,
-      const Alignment(0.0, -0.9),
-      const Alignment(0.0, -0.7),
-      0.80,
-    );
-  }
-
-  double _ease(double t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-  @override
-  bool shouldRepaint(_BackgroundPainter old) =>
-      old.t1 != t1 || old.t2 != t2 || old.t3 != t3;
-}
-
-//
-// Star data
-//
-class _Star {
-  final double x, y, size, speed, phase, opacity;
-  _Star(math.Random rng)
-    : x = rng.nextDouble(),
-      y = rng.nextDouble(),
-      size = 0.8 + rng.nextDouble() * 2.0,
-      speed = 0.3 + rng.nextDouble() * 0.7,
-      phase = rng.nextDouble(),
-      opacity = 0.3 + rng.nextDouble() * 0.5;
-}
-
-//
-// Star field painter  twinkle effect
-//
-class _StarPainter extends CustomPainter {
-  final double t;
-  final List<_Star> stars;
-  const _StarPainter({required this.t, required this.stars});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white;
-    for (final s in stars) {
-      final twinkle = (math.sin((t + s.phase) * 2 * math.pi * s.speed) + 1) / 2;
-      paint.color = Colors.white.withValues(alpha: s.opacity * twinkle);
-      canvas.drawCircle(
-        Offset(s.x * size.width, s.y * size.height),
-        s.size * twinkle + 0.3,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_StarPainter old) => old.t != t;
-}
-
-//
-// Orbiting ring painter  drawn centred on screen
-//
-class _RingPainter extends CustomPainter {
-  final double t;
-  const _RingPainter({required this.t});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-
-    // Outer slow ring
-    _drawEllipseRing(
-      canvas,
-      cx,
-      cy,
-      rx: size.width * 0.62,
-      ry: size.height * 0.22,
-      tilt: -0.30,
-      angle: t * 2 * math.pi,
-      color: _kPurple.withValues(alpha: 0.20),
-      strokeW: 1.0,
-    );
-
-    // Inner faster ring
-    _drawEllipseRing(
-      canvas,
-      cx,
-      cy,
-      rx: size.width * 0.45,
-      ry: size.height * 0.16,
-      tilt: 0.20,
-      angle: -t * 2 * math.pi * 1.4,
-      color: _kIndigo.withValues(alpha: 0.20),
-      strokeW: 0.8,
-    );
-
-    // Tiny cyan ring
-    _drawEllipseRing(
-      canvas,
-      cx,
-      cy,
-      rx: size.width * 0.30,
-      ry: size.height * 0.10,
-      tilt: 0.50,
-      angle: t * 2 * math.pi * 2.0,
-      color: _kCyan.withValues(alpha: 0.18),
-      strokeW: 0.6,
-    );
-
-    // Dot orbiting the outer ring
-    _drawOrbitDot(
-      canvas,
-      cx,
-      cy,
-      rx: size.width * 0.62,
-      ry: size.height * 0.22,
-      tilt: -0.30,
-      angle: t * 2 * math.pi,
-      color: _kPurple,
-      dotR: 4.0,
-    );
-
-    _drawOrbitDot(
-      canvas,
-      cx,
-      cy,
-      rx: size.width * 0.45,
-      ry: size.height * 0.16,
-      tilt: 0.20,
-      angle: -t * 2 * math.pi * 1.4 + math.pi,
-      color: _kCyan,
-      dotR: 3.0,
-    );
-  }
-
-  void _drawEllipseRing(
-    Canvas canvas,
-    double cx,
-    double cy, {
-    required double rx,
-    required double ry,
-    required double tilt,
-    required double angle,
-    required Color color,
-    required double strokeW,
-  }) {
-    canvas.save();
-    canvas.translate(cx, cy);
-    canvas.transform(_mat4RotX(tilt).storage);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2),
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeW,
-    );
-    canvas.restore();
-  }
-
-  void _drawOrbitDot(
-    Canvas canvas,
-    double cx,
-    double cy, {
-    required double rx,
-    required double ry,
-    required double tilt,
-    required double angle,
-    required Color color,
-    required double dotR,
-  }) {
-    final cosA = math.cos(angle);
-    final sinA = math.sin(angle);
-    final x = rx * cosA;
-    final rawY = ry * sinA;
-    final cosTilt = math.cos(tilt);
-    final y = rawY * cosTilt;
-
-    // glow
-    canvas.drawCircle(
-      Offset(cx + x, cy + y),
-      dotR * 3,
-      Paint()
-        ..color = color.withValues(alpha: 0.25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
-    canvas.drawCircle(Offset(cx + x, cy + y), dotR, Paint()..color = color);
-  }
-
-  Matrix4 _mat4RotX(double angle) {
-    final c = math.cos(angle), s = math.sin(angle);
-    return Matrix4(1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, 0, 0, 1);
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) => old.t != t;
-}
-
-//
-// Auth Card   3D-tilting glass panel
-//
-class _AuthCard extends StatelessWidget {
-  final int tab;
-  final bool isLoading;
-  final ValueChanged<int> onSwitchTab;
-  final TextEditingController loginEmail, loginPass;
-  final bool obscureLogin;
-  final VoidCallback onToggleLogin;
-  final TextEditingController signupName, signupEmail, signupPass;
-  final bool obscureSignup;
-  final VoidCallback onToggleSignup;
-  final VoidCallback onLoginTap;
-  final VoidCallback onSignupTap;
-  final VoidCallback onGoogleSignInTap;
-  final AnimationController glowAnim;
-
-  const _AuthCard({
-    required this.tab,
-    required this.isLoading,
-    required this.onSwitchTab,
-    required this.loginEmail,
-    required this.loginPass,
-    required this.obscureLogin,
-    required this.onToggleLogin,
-    required this.signupName,
-    required this.signupEmail,
-    required this.signupPass,
-    required this.obscureSignup,
-    required this.onToggleSignup,
-    required this.onLoginTap,
-    required this.onSignupTap,
-    required this.onGoogleSignInTap,
-    required this.glowAnim,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-          animation: glowAnim,
-          builder: (_, child) {
-            final glow = glowAnim.value; // 01 pulsing
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: _kPurple.withValues(alpha: 0.08 + glow * 0.10),
-                    blurRadius: 40 + glow * 20,
-                    spreadRadius: -4,
+  Widget _buildPhone(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                40,
+                AppSpacing.gutter,
+                AppSpacing.xxl,
+              ),
+              child: StaggeredColumn(
+                children: [
+                  const _WordmarkRow(),
+                  const SizedBox(height: AppSpacing.xxxl),
+                  _Heading(isSignup: _isSignup),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _SegmentedControl(
+                    index: _tab,
+                    labels: const ['Login', 'Sign up'],
+                    enabled: !_isLoading,
+                    onChanged: _switchTab,
                   ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _buildFields(),
+                  const SizedBox(height: AppSpacing.xxl),
+                  _buildActions(),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF121216), // Solid dark surface
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: const Color(0xFF7F77DD).withValues(
-                        alpha: 0.3 + glow * 0.4,
-                      ), // Thin purple border
-                      width: 1.0,
-                    ),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(0, 28, 0, 28),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              //  Animated logo orb with Hero
-              Hero(
-                tag: 'app-logo',
-                child: _LogoOrb(glowAnim: glowAnim),
-              ),
-
-              const SizedBox(height: 12),
-
-              //  Gradient title
-              ShaderMask(
-                shaderCallback: (r) => const LinearGradient(
-                  colors: [Color(0xFFDDB4FF), Colors.white, Color(0xFF93C5FD)],
-                  stops: [0.0, 0.5, 1.0],
-                ).createShader(r),
-                child: Text(
-                  'ClashChat',
-                  style: GoogleFonts.poppins(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                'WHERE EVERY WORD IS A WEAPON',
-                style: GoogleFonts.poppins(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
-                  color: _kHint,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              //  Toggle row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _ToggleRow(
-                  active: tab,
-                  disabled: isLoading,
-                  onSwitch: onSwitchTab,
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              //  Form switcher
-              AnimatedSize(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeInOutCubic,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 420),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, anim) => FadeTransition(
-                    opacity: anim,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.07),
-                        end: Offset.zero,
-                      ).animate(anim),
-                      child: child,
-                    ),
-                  ),
-                  child: tab == 0
-                      ? KeyedSubtree(
-                          key: const ValueKey('login'),
-                          child: _LoginForm(
-                            emailCtrl: loginEmail,
-                            passCtrl: loginPass,
-                            obscure: obscureLogin,
-                            isLoading: isLoading,
-                            onToggle: onToggleLogin,
-                            onSubmit: onLoginTap,
-                            onGoogleSignInTap: onGoogleSignInTap,
-                          ),
-                        )
-                      : KeyedSubtree(
-                          key: const ValueKey('signup'),
-                          child: _SignupForm(
-                            nameCtrl: signupName,
-                            emailCtrl: signupEmail,
-                            passCtrl: signupPass,
-                            obscure: obscureSignup,
-                            isLoading: isLoading,
-                            onToggle: onToggleSignup,
-                            onSubmit: onSignupTap,
-                            onGoogleSignInTap: onGoogleSignInTap,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        )
-        .animate()
-        .fadeIn(duration: 900.ms, curve: Curves.easeOut)
-        .scale(
-          begin: const Offset(0.90, 0.90),
-          end: const Offset(1.00, 1.00),
-          delay: 200.ms,
-          duration: 700.ms,
-          curve: Curves.easeOutBack,
-        );
-  }
-}
-
-//
-// Logo orb  spinning ring + pulsing glow
-//
-class _LogoOrb extends StatelessWidget {
-  final AnimationController glowAnim;
-  const _LogoOrb({required this.glowAnim});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: glowAnim,
-      builder: (_, _) {
-        final g = glowAnim.value;
-        return SizedBox(
-          width: 88,
-          height: 88,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Outer glow ring
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _kPurple.withValues(alpha: 0.45 + g * 0.25),
-                      blurRadius: 20 + g * 18,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-              ),
-              // Orb body
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const AppLogoWidget(size: 72),
-              ),
-              // Rotating arc
-              Transform.rotate(
-                angle: glowAnim.value * 2 * math.pi,
-                child: CustomPaint(
-                  size: const Size(88, 88),
-                  painter: _ArcPainter(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ArcPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.width / 2;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round
-      ..shader = const SweepGradient(
-        colors: [Colors.transparent, _kCyan, Colors.transparent],
-      ).createShader(Rect.fromCircle(center: Offset(r, r), radius: r));
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(r, r), radius: r - 1),
-      0,
-      math.pi * 1.5,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-//
-// Toggle row
-//
-class _ToggleRow extends StatelessWidget {
-  final int active;
-  final bool disabled;
-  final ValueChanged<int> onSwitch;
-  const _ToggleRow({
-    required this.active,
-    this.disabled = false,
-    required this.onSwitch,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          _ToggleBtn(
-            label: 'Sign In',
-            active: active == 0,
-            onTap: disabled ? () {} : () => onSwitch(0),
-          ),
-          _ToggleBtn(
-            label: 'Create Account',
-            active: active == 1,
-            onTap: disabled ? () {} : () => onSwitch(1),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToggleBtn extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-  const _ToggleBtn({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeInOutCubic,
-          decoration: BoxDecoration(
-            gradient: active
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [_kPurple, _kIndigo],
-                  )
-                : null,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: _kPurple.withValues(alpha: 0.45),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [],
-          ),
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 220),
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active ? Colors.white : _kHint,
-              ),
-              child: Text(label),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-//
-// Sign-in form
-//
-class _LoginForm extends StatelessWidget {
-  final TextEditingController emailCtrl, passCtrl;
-  final bool obscure;
-  final bool isLoading;
-  final VoidCallback onToggle, onSubmit, onGoogleSignInTap;
-
-  const _LoginForm({
-    required this.emailCtrl,
-    required this.passCtrl,
-    required this.obscure,
-    required this.isLoading,
-    required this.onToggle,
-    required this.onSubmit,
-    required this.onGoogleSignInTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DarkField(
-            ctrl: emailCtrl,
-            label: 'EMAIL',
-            hint: 'you@example.com',
-            icon: Icons.alternate_email_rounded,
-            keyboardType: TextInputType.emailAddress,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 16),
-          _DarkField(
-            ctrl: passCtrl,
-            label: 'PASSWORD',
-            hint: '',
-            icon: Icons.lock_outline_rounded,
-            obscure: obscure,
-            onToggle: onToggle,
-            enabled: !isLoading,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: isLoading ? null : () {},
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                'Forgot password?',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _kGold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          _CTA(
-            label: 'Sign In',
-            isLoading: isLoading,
-            onTap: onSubmit,
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: isLoading ? null : onGoogleSignInTap,
-            child: AnimatedOpacity(
-              opacity: isLoading ? 0.6 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                width: double.infinity,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A24),
-                  border: Border.all(color: const Color(0xFF2A2A35), width: 1.0),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset('assets/google_icon.png', height: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Continue with Google',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-//
-// Sign-up form
-//
-class _SignupForm extends StatelessWidget {
-  final TextEditingController nameCtrl, emailCtrl, passCtrl;
-  final bool obscure;
-  final bool isLoading;
-  final VoidCallback onToggle, onSubmit, onGoogleSignInTap;
-
-  const _SignupForm({
-    required this.nameCtrl,
-    required this.emailCtrl,
-    required this.passCtrl,
-    required this.obscure,
-    required this.isLoading,
-    required this.onToggle,
-    required this.onSubmit,
-    required this.onGoogleSignInTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DarkField(
-            ctrl: nameCtrl,
-            label: 'FULL NAME',
-            hint: 'Your name',
-            icon: Icons.person_outline_rounded,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 16),
-          _DarkField(
-            ctrl: emailCtrl,
-            label: 'EMAIL',
-            hint: 'you@example.com',
-            icon: Icons.alternate_email_rounded,
-            keyboardType: TextInputType.emailAddress,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 16),
-          _DarkField(
-            ctrl: passCtrl,
-            label: 'PASSWORD',
-            hint: '••••••••',
-            icon: Icons.lock_outline_rounded,
-            obscure: obscure,
-            onToggle: onToggle,
-            enabled: !isLoading,
-          ),
-          const SizedBox(height: 24),
-          _CTA(
-            label: 'Join Debate',
-            isLoading: isLoading,
-            onTap: onSubmit,
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: isLoading ? null : onGoogleSignInTap,
-            child: AnimatedOpacity(
-              opacity: isLoading ? 0.6 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: _kBg.withValues(alpha: 0.5),
-                  border: Border.all(color: _kBorder, width: 1.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset('assets/google_icon.png', height: 24),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Continue with Google',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-//
-// Dark text field
-//
-class _DarkField extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String label, hint;
-  final IconData icon;
-  final bool obscure;
-  final bool enabled;
-  final VoidCallback? onToggle;
-  final TextInputType? keyboardType;
-
-  const _DarkField({
-    required this.ctrl,
-    required this.label,
-    required this.hint,
-    required this.icon,
-    this.obscure = false,
-    this.enabled = true,
-    this.onToggle,
-    this.keyboardType,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildDesktop(BuildContext context) {
+    final c = context.colors;
+    return Row(
       children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.1,
-            color: _kHint,
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: c.inset,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.huge,
+              vertical: AppSpacing.huge,
+            ),
+            child: const _BrandPanel(),
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: enabled ? 0.04 : 0.02),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBorder.withValues(alpha: 0.1)),
-          ),
+        Expanded(
+          flex: 6,
           child: Center(
-            child: TextFormField(
-              controller: ctrl,
-              obscureText: obscure,
-              enabled: enabled,
-              keyboardType: keyboardType,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: enabled ? Colors.white : _kHint,
-              ),
-              textAlignVertical: TextAlignVertical.center,
-              decoration: InputDecoration(
-                isCollapsed: true,
-                hintText: hint,
-                hintStyle: GoogleFonts.poppins(fontSize: 14, color: _kHint),
-                prefixIcon: Icon(icon, size: 18, color: _kSubtle),
-                suffixIcon: onToggle != null
-                    ? IconButton(
-                        onPressed: onToggle,
-                        icon: Icon(
-                          obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 18,
-                          color: _kHint,
-                        ),
-                      )
-                    : null,
-                filled: false,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.gutter,
+                  vertical: AppSpacing.huge,
+                ),
+                child: StaggeredColumn(
+                  children: [
+                    _Heading(isSignup: _isSignup),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _SegmentedControl(
+                      index: _tab,
+                      labels: const ['Login', 'Sign up'],
+                      enabled: !_isLoading,
+                      onChanged: _switchTab,
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildFields(),
+                    const SizedBox(height: AppSpacing.xxl),
+                    _buildActions(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1305,142 +320,445 @@ class _DarkField extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildFields() {
+    final enabled = !_isLoading;
+    final child = _isSignup
+        ? Column(
+            key: const ValueKey('signup'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(
+                label: 'Display name',
+                hint: 'How opponents will see you',
+                controller: _signupName,
+                enabled: enabled,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.name],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppTextField(
+                label: 'Email',
+                hint: 'you@example.com',
+                controller: _signupEmail,
+                enabled: enabled,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppTextField(
+                label: 'Password',
+                hint: 'At least 8 characters',
+                controller: _signupPass,
+                enabled: enabled,
+                obscure: true,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                onSubmitted: (_) => _submit(),
+              ),
+            ],
+          )
+        : Column(
+            key: const ValueKey('login'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(
+                label: 'Email',
+                hint: 'you@example.com',
+                controller: _loginEmail,
+                enabled: enabled,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppTextField(
+                label: 'Password',
+                hint: 'Your password',
+                controller: _loginPass,
+                enabled: enabled,
+                obscure: true,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                onSubmitted: (_) => _submit(),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: Alignment.centerRight,
+                child: AppButton.ghost(
+                  label: 'Forgot password?',
+                  size: AppButtonSize.small,
+                  onPressed: enabled ? _forgotPassword : null,
+                ),
+              ),
+            ],
+          );
+
+    return AnimatedSize(
+      duration: AppDurations.fast,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: AppDurations.fast,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [...previous, ?current],
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppButton.primary(
+          label: 'Continue',
+          loading: _isLoading,
+          onPressed: _submit,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const _OrDivider(),
+        const SizedBox(height: AppSpacing.lg),
+        _GoogleButton(
+          label: 'Continue with Google',
+          onPressed: _isLoading ? null : _handleGoogleSignIn,
+        ),
+      ],
+    );
+  }
 }
 
-//
-// CTA button  shimmer gradient
-//
-class _CTA extends StatelessWidget {
-  final String label;
-  final bool isLoading;
-  final VoidCallback onTap;
-  const _CTA({
-    required this.label,
-    this.isLoading = false,
-    required this.onTap,
-  });
+// ── Pieces ──
+
+class _WordmarkRow extends StatelessWidget {
+  const _WordmarkRow();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isLoading ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 52,
-        decoration: BoxDecoration(
-          color: isLoading
-              ? const Color(0xFF7F77DD).withValues(alpha: 0.6)
-              : const Color(0xFF7F77DD),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF7F77DD).withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
+    return Row(
+      children: [
+        const AppLogoWidget(size: 28),
+        const SizedBox(width: AppSpacing.md),
+        Text('ClashChat', style: context.text.titleMedium),
+      ],
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading({required this.isSignup});
+
+  final bool isSignup;
+
+  static Widget _topLeft(Widget? current, List<Widget> previous) => Stack(
+        alignment: Alignment.topLeft,
+        children: [...previous, ?current],
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSwitcher(
+          duration: AppDurations.fast,
+          layoutBuilder: _topLeft,
+          child: Text(
+            isSignup ? 'Create your account' : 'Welcome back',
+            key: ValueKey(isSignup),
+            style: context.text.headlineLarge,
+          ),
         ),
-        child: Center(
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+        const SizedBox(height: AppSpacing.sm),
+        AnimatedSwitcher(
+          duration: AppDurations.fast,
+          layoutBuilder: _topLeft,
+          child: Text(
+            isSignup
+                ? 'A name, an email and a password. Then pick a side.'
+                : 'Sign in to pick up your record where you left it.',
+            key: ValueKey(isSignup),
+            style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Two-option segmented control: raised card with a soft brass pill
+/// indicator that slides under the selected label.
+class _SegmentedControl extends StatelessWidget {
+  const _SegmentedControl({
+    required this.index,
+    required this.labels,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  final int index;
+  final List<String> labels;
+  final ValueChanged<int> onChanged;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final count = labels.length;
+
+    return AppCard(
+      level: AppCardLevel.raised,
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      radius: AppRadius.mdAll,
+      child: SizedBox(
+        height: 40,
+        child: Stack(
+          children: [
+            AnimatedAlign(
+              duration: AppDurations.fast,
+              curve: Curves.easeOutCubic,
+              alignment: Alignment(
+                count == 1 ? 0 : -1 + (2 * index / (count - 1)),
+                0,
+              ),
+              child: FractionallySizedBox(
+                widthFactor: 1 / count,
+                heightFactor: 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.accentSoft,
+                    borderRadius: AppRadius.smAll,
                   ),
                 ),
+              ),
+            ),
+            Row(
+              children: [
+                for (var i = 0; i < count; i++)
+                  Expanded(
+                    child: Pressable(
+                      onTap: enabled ? () => onChanged(i) : null,
+                      enabled: enabled,
+                      pressedScale: 0.97,
+                      semanticLabel: labels[i],
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(
+                          duration: AppDurations.fast,
+                          style: context.text.labelLarge!.copyWith(
+                            color: i == index ? c.textPrimary : c.textSecondary,
+                          ),
+                          child: Text(labels[i]),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ══════════════════════════════════════════════════════════
-// Themed Dialog Widget
-// ══════════════════════════════════════════════════════════
-class _ThemedDialog extends StatelessWidget {
-  final String title;
-  final String content;
-  final List<(String, Color?)> actions;
-  final Future<void> Function(int)? onActionSelected;
-
-  const _ThemedDialog({
-    required this.title,
-    required this.content,
-    required this.actions,
-    // ignore: unused_element_parameter
-    this.onActionSelected,
-  });
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: _kBg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.15),
-          width: 1.5,
+    final c = context.colors;
+    return Row(
+      children: [
+        Expanded(child: Divider(color: c.border)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: Text(
+            'or',
+            style: context.text.labelSmall?.copyWith(color: c.textHint),
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(child: Divider(color: c.border)),
+      ],
+    );
+  }
+}
+
+/// Secondary-style button with an image as the leading element.
+///
+/// Built privately because [AppButton] only accepts an [IconData] leading
+/// slot; this mirrors its secondary variant (surface, strong hairline,
+/// 52 px, radius 14, 0.98 press scale).
+class _GoogleButton extends StatelessWidget {
+  const _GoogleButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final enabled = onPressed != null;
+    final fg = enabled ? c.textPrimary : c.textHint;
+
+    return Pressable(
+      onTap: onPressed,
+      enabled: enabled,
+      semanticLabel: label,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        curve: Curves.easeOutCubic,
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+        decoration: BoxDecoration(
+          color: enabled ? c.surface : c.surfaceRaised,
+          borderRadius: AppRadius.mdAll,
+          border: Border.all(color: c.borderStrong),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            Opacity(
+              opacity: enabled ? 1 : 0.5,
+              child: Image.asset(
+                'assets/google_icon.png',
+                width: 18,
+                height: 18,
+                filterQuality: FilterQuality.medium,
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              content,
-              style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: List.generate(actions.length, (index) {
-                final (label, color) = actions[index];
-                return Padding(
-                  padding: EdgeInsets.only(left: index == 0 ? 0 : 12),
-                  child: TextButton(
-                    onPressed: () async {
-                      if (onActionSelected != null) {
-                        await onActionSelected!(index);
-                      } else {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    child: Text(
-                      label,
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        color: color ?? _kPurple,
-                      ),
-                    ),
-                  ),
-                );
-              }),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.labelLarge?.copyWith(color: fg),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Desktop-only left column: wordmark, statement and the three modes.
+class _BrandPanel extends StatelessWidget {
+  const _BrandPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final display = context.text.displayMedium;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const AppLogoWidget(size: 40),
+            const SizedBox(width: AppSpacing.lg),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Clash',
+                    style: display?.copyWith(color: c.textPrimary),
+                  ),
+                  TextSpan(
+                    text: 'Chat',
+                    style: display?.copyWith(color: c.accent),
+                  ),
+                ],
+              ),
+              semanticsLabel: 'ClashChat',
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Text(
+            'Debate an opponent that pushes back, get scored on every '
+            'argument, and watch your record climb.',
+            style: context.text.bodyLarge?.copyWith(color: c.textSecondary),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.huge),
+        StaggeredColumn(
+          startIndex: 2,
+          children: [
+            _ModeRow(
+              icon: AppIcons.casualDuo,
+              color: c.positiveText,
+              background: c.positiveBg,
+              title: 'Casual',
+              body: 'Pick a topic and a side. No stakes, just practice.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _ModeRow(
+              icon: AppIcons.rankedDuo,
+              color: c.rankText,
+              background: c.rankBg,
+              title: 'Ranked',
+              body: 'Timed rounds that count toward your rank.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _ModeRow(
+              icon: AppIcons.learningDuo,
+              color: c.infoText,
+              background: c.infoBg,
+              title: 'Learning',
+              body: 'Coaching tips after every message you send.',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ModeRow extends StatelessWidget {
+  const _ModeRow({
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppIconTile(icon: icon, color: color, background: background),
+        const SizedBox(width: AppSpacing.lg),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: context.text.titleSmall),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(body, style: context.text.bodySmall),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

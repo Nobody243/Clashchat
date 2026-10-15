@@ -44,7 +44,7 @@ ClashChat is a portfolio/learning project demonstrating:
 - Firebase Authentication (Email + Google Sign-In)
 - Firestore-backed user profiles and debate records
 - AI scoring and chat via Groq API integration (routed securely via proxy)
-- Dicebear avatar seeds rendered as SVG
+- Dicebear avatars (thumbs style, brand palette) rendered as SVG
 - Daily per-user usage quota of 40 debates (client-enforced for demo)
 - Dark/Light theme with smooth transitions
 - Debate history with filtering capabilities
@@ -93,7 +93,7 @@ To run this project yourself:
    ```
 
 > [!NOTE]
-> The AI chat feature uses the Groq API via a Cloudflare Worker proxy. You'll need your own Groq API key and your own proxy setup for that feature to work — the deployed proxy is tied to the maintainer's account.
+> The AI chat feature uses the Groq API via a Cloudflare Worker proxy (sibling repo `clashchat-proxy`). You'll need your own Groq API key and your own Worker deployment for that feature to work — the deployed proxy is tied to the maintainer's account and only accepts ID tokens from the maintainer's Firebase project.
 
 ## Configuration
 
@@ -177,12 +177,19 @@ The project follows a modular architecture pattern:
 
 ```
 lib/
-├── core/           # Theme, colors, providers
+├── core/           # Theme, design tokens (colors, typography, spacing), providers
 ├── models/         # Data structures (ChatMessage, DebateRecord)
 ├── screens/        # UI screens and navigation
 ├── services/       # Business logic (Auth, AI, Session)
 └── widgets/        # Reusable UI components
 ```
+
+### Design System
+
+`DESIGN.md` is the source of truth. Code lives in two places:
+
+- `lib/core` — tokens and theme. `app_colors_ext.dart` holds the semantic palette for both themes (read via `context.colors`), `app_typography.dart` the Outfit type scale (`context.text`) plus `context.mono()` for JetBrains Mono numerics, `app_spacing.dart` the spacing/radius/duration scales, and `app_theme.dart` builds `ThemeData` from them. The theme choice is persisted by `ThemeProvider`.
+- `lib/ui` — the component kit: `AppButton`, `AppIconButton`, `AppCard`/`AppListGroup`/`AppIconTile`, `AppPill`, `AppTextField`, `AppSkeleton`, `AppEmptyState`, `AppSectionHeader`, `ScoreRing`, `Pressable`, `StaggeredColumn`, and `AppIcons` (Lucide). Screens compose these and never hardcode colors, font sizes, `Icons.*`, or emoji.
 
 ### Key Components
 
@@ -193,13 +200,21 @@ lib/
 
 ### API Routing Architecture
 
-For security, Groq API calls are not made directly from the client. Instead, they route through a separate, privately-hosted server-side proxy to protect API keys:
+Groq is never called from the client. Every AI request goes through a Cloudflare Worker
+(`clashchat-proxy`, a sibling repo) that holds the Groq key:
 
 ```
-[Flutter App] --(APP_SHARED_SECRET)--> [Server-side Proxy] --(GROQ_API_KEY)--> [Groq API (gpt-oss-120b / fallback)]
+[Flutter App] --(X-App-Secret + Firebase ID token)--> [Cloudflare Worker] --(GROQ_API_KEY)--> [Groq]
 ```
 
-The `APP_SHARED_SECRET` acts as a lightweight abuse deterrent at the proxy level. AIService automatically cycles through verified active models on failover.
+The Worker:
+- verifies the **Firebase ID token** (RS256, Google public keys) so it knows which user is calling,
+- checks the `X-App-Secret` header with a timing-safe compare (abuse deterrent only; the value ships in the client),
+- rate-limits per user (20 completions / minute),
+- allow-lists models, caps `max_tokens`, strips unknown fields, and rejects bodies over 64 KB,
+- streams Groq's SSE body straight through when `stream: true`.
+
+`AIService` sends the current user's ID token on every call and cycles through the allowed models on failover.
 
 ### Responsive Layout Support
 
@@ -222,14 +237,13 @@ To support wider viewports on desktop browsers, the app uses a mobile-first desi
 |---------|---------|---------|
 | google_fonts | ^6.2.1 | Custom typography |
 | flutter_animate | ^4.5.0 | Animations |
-| lottie | ^3.1.2 | Lottie animations |
 | flutter_svg | ^2.0.10+1 | SVG rendering |
+| lucide_icons_flutter | ^3.1.25 | Icon set |
 
 ### State Management & Storage
 | Package | Version | Purpose |
 |---------|---------|---------|
 | provider | ^6.1.2 | State management |
-| hive | ^2.2.3 | Local database |
 | shared_preferences | ^2.2.3 | Key-value storage |
 
 ### Utilities
@@ -253,9 +267,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
 
 This is a demo/portfolio application and is not production-hardened. Important considerations:
 
-- **Proxy-based API Routing**: Groq API calls are routed through a separate, privately-hosted server-side proxy (not included in this repository) to keep the Groq API key out of the client app.
-- **Abuse Deterrence**: The app uses `APP_SHARED_SECRET` as a lightweight header token when talking to the proxy. This is an abuse-deterrent measure, not a strong cryptographic security boundary, as the secret is necessarily present in the compiled client app.
-- **Do Not Commit Secrets**: Never commit real secrets, environment files (`env`), or Firebase configuration files to version control.
+- **Proxy-based API Routing**: Groq API calls are routed through the Cloudflare Worker described above so the Groq key never reaches the client. The Worker also verifies Firebase ID tokens and rate-limits per user.
+- **Abuse Deterrence**: `APP_SHARED_SECRET` is a lightweight header token. It is present in the compiled client, so it is not a security boundary on its own; the Firebase ID token is.
+- **Do Not Commit Secrets**: `env`, `lib/firebase_options.dart`, `android/app/google-services.json` and the Flutter `ephemeral/` folders are git-ignored and must stay that way. The release workflow reads them from GitHub Actions secrets (`APP_SHARED_SECRET`, `FIREBASE_OPTIONS_B64`, `GOOGLE_SERVICES_B64`, optional `GOOGLE_WEB_CLIENT_ID`) and fails if any is missing.
+- **Deploy order**: deploy the Worker first (it ships with `REQUIRE_FIREBASE_AUTH: "false"`, accepting old and new clients), then the clients, then flip the Worker to required auth. The web build cannot talk to the pre-token Worker because of its CORS allow-list.
+- **Rotating `APP_SHARED_SECRET`**: generate a new value (`openssl rand -hex 32`) and set it in three places: the Worker (`npx wrangler secret put APP_SHARED_SECRET`), the GitHub Actions secret, and your local `env`. Old builds stop working the moment the Worker secret changes.
+- **Firestore rules** validate quota and rank fields on the client-owned user document. Rank points may only move by one debate's worth per write (+50 / -20). Moving scoring and point awards server-side is the next step.
 - **Avatars**: Avatar seeds are stored as strings and rendered via `flutter_svg` for consistent avatar generation.
 
 ## License

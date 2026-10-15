@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' show min;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +19,27 @@ class AiService {
     'openai/gpt-oss-20b',
     'groq/compound',
   ];
+
+  /// Headers for every proxy call.
+  ///
+  /// `X-App-Secret` is a cheap abuse deterrent (it ships inside the client).
+  /// The real identity check is the Firebase ID token: the proxy verifies it
+  /// and uses the uid for per-user rate limiting.
+  static Future<Map<String, String>> _authHeaders() async {
+    final headers = <String, String>{
+      'X-App-Secret': _appSecret,
+      'Content-Type': 'application/json',
+    };
+    try {
+      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken != null && idToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $idToken';
+      }
+    } catch (e) {
+      debugPrint('AiService: could not fetch ID token: $e');
+    }
+    return headers;
+  }
 
   static Future<http.Response?> _postWithFallback(
     List<Map<String, String>> messages, {
@@ -41,13 +63,7 @@ class AiService {
         final response = await http
             .post(
               Uri.parse(_apiEndpoint),
-              headers: {
-                // APP_SHARED_SECRET is an abuse deterrent, not a cryptographic secret,
-                // since it will be visible in the compiled web client. Its only purpose
-                // is to block casual/automated direct calls to the proxy endpoint.
-                'X-App-Secret': _appSecret,
-                'Content-Type': 'application/json',
-              },
+              headers: await _authHeaders(),
               body: jsonEncode(requestBody),
             )
             .timeout(
@@ -289,10 +305,7 @@ CORE DEBATE RULES:
   }
 
   /// Streams debate opponent replies token by token via Server-Sent Events (SSE).
-  ///
-  /// NOTE: The Cloudflare Worker proxy (clashchat-proxy) must also be updated to
-  /// forward `stream: true` and pipe through the SSE response headers and body
-  /// for this to work end-to-end.
+  /// The proxy passes Groq's SSE body straight through when `stream: true`.
   static Stream<String> sendDebateMessageStream({
     required String topic,
     required String userStance,
@@ -332,10 +345,7 @@ CORE DEBATE RULES:
 
       try {
         final request = http.Request('POST', Uri.parse(_apiEndpoint))
-          ..headers.addAll({
-            'X-App-Secret': _appSecret,
-            'Content-Type': 'application/json',
-          })
+          ..headers.addAll(await _authHeaders())
           ..body = jsonEncode({
             'model': model,
             'messages': messages,
@@ -420,7 +430,7 @@ CORE DEBATE RULES:
 
       final userMessageCount = messages.where((m) => m.isUser).length;
 
-      debugPrint('🎯 SCORING SESSION:');
+      debugPrint('SCORING SESSION:');
       debugPrint('   Topic: $topic');
       debugPrint('   User stance: $userStance');
       debugPrint('   Difficulty: $difficulty');
@@ -515,7 +525,7 @@ Judge fairly for this difficulty level. Score now with ONLY the JSON object.
       if (response != null && response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final rawText = data['choices']?[0]?['message']?['content'] as String?;
-        debugPrint('✅ API RESPONSE TEXT: "$rawText"');
+        debugPrint('API RESPONSE TEXT: "$rawText"');
 
         if (rawText != null && rawText.isNotEmpty) {
           final text = _cleanAiText(rawText);
@@ -533,51 +543,51 @@ Judge fairly for this difficulty level. Score now with ONLY the JSON object.
             }
 
             if (parsed != null) {
-              debugPrint('✅ PARSED JSON: $parsed');
+              debugPrint('PARSED JSON: $parsed');
 
               final rawScore = parsed['score'];
               debugPrint(
-                '📊 RAW SCORE VALUE: "$rawScore" (Type: ${rawScore.runtimeType})',
+                'RAW SCORE VALUE: "$rawScore" (Type: ${rawScore.runtimeType})',
               );
 
               int? score;
               if (rawScore is int) {
                 score = rawScore;
-                debugPrint('  ✓ Score is int: $score');
+                debugPrint('  Score is int: $score');
               } else if (rawScore is double) {
                 score = rawScore.toInt();
-                debugPrint('  ✓ Score is double, converted: $score');
+                debugPrint('  Score is double, converted: $score');
               } else if (rawScore is String) {
                 score = int.tryParse(rawScore);
-                debugPrint('  ✓ Score is string, parsed: $score');
+                debugPrint('  Score is string, parsed: $score');
               } else {
-                debugPrint('  ✗ Score is unexpected type: ${rawScore.runtimeType}');
+                debugPrint('  Score is unexpected type: ${rawScore.runtimeType}');
               }
 
               if (score != null && score >= 10 && score <= 100) {
-                debugPrint('✅ SCORE IS VALID (10-100): $score');
+                debugPrint('SCORE IS VALID (10-100): $score');
                 parsed['score'] = score;
                 parsed['strengths'] = _normalizeStringList(parsed['strengths']);
                 parsed['weaknesses'] = _normalizeStringList(parsed['weaknesses']);
                 parsed['summary'] = parsed['summary']?.toString() ?? 'Debate completed';
-                debugPrint('✅✅ RETURNING SCORE: $score from parseDebate()');
+                debugPrint('RETURNING SCORE: $score from parseDebate()');
                 return parsed;
               } else {
-                debugPrint('❌ SCORE OUT OF VALID RANGE: $score (must be 10-100)');
+                debugPrint('SCORE OUT OF VALID RANGE: $score (must be 10-100)');
               }
             } else {
-              debugPrint('❌ Could not parse JSON from response text: $text');
+              debugPrint('Could not parse JSON from response text: $text');
             }
           } catch (parseError) {
-            debugPrint('❌ JSON PARSE ERROR: $parseError');
+            debugPrint('JSON PARSE ERROR: $parseError');
             debugPrint('   Stack: ${StackTrace.current}');
           }
         } else {
-          debugPrint('⚠️ Empty API response text');
+          debugPrint('Empty API response text');
         }
       }
 
-      debugPrint('⚠️ FALLING BACK TO HARDCODED SCORE: 65');
+      debugPrint('FALLING BACK TO HARDCODED SCORE: 65');
       return {
         'score': 65,
         'strengths': ['Good effort'],
@@ -585,9 +595,9 @@ Judge fairly for this difficulty level. Score now with ONLY the JSON object.
         'summary': 'Debate completed',
       };
     } catch (e, stackTrace) {
-      debugPrint('❌ CRITICAL GROQ ERROR: $e');
+      debugPrint('CRITICAL GROQ ERROR: $e');
       debugPrint('   Stack: $stackTrace');
-      debugPrint('⚠️ FALLING BACK (ERROR): score 65');
+      debugPrint('FALLING BACK (ERROR): score 65');
       return {
         'score': 65,
         'strengths': ['Good effort'],

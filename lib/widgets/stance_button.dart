@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../core/app_colors.dart';
 
-/// One side of the "For / Against" segmented stance control on the Home screen.
+import '../ui/ui.dart';
+
+/// One side of the "For / Against" choice: a large selectable card.
+///
+/// Tone is derived from [label] ("For" -> positive/sage, anything else ->
+/// negative/terracotta). [activeGradient] is accepted for source
+/// compatibility with older call sites and is no longer used; the design
+/// system has no gradients.
 class StanceButton extends StatelessWidget {
   final String label;
   final bool isSelected;
@@ -10,48 +15,97 @@ class StanceButton extends StatelessWidget {
   final VoidCallback onTap;
   final IconData? icon;
 
+  /// One short line under the title, e.g. "You argue in favour".
+  final String? description;
+
   const StanceButton({
     super.key,
     required this.label,
     required this.isSelected,
-    required this.activeGradient,
+    this.activeGradient = const [],
     required this.onTap,
     this.icon,
+    this.description,
   });
+
+  bool get _isFor => label.trim().toLowerCase() == 'for';
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final unselectedColor = isDark ? Colors.white70 : const Color(0xFF1A1A2E);
-    final contentColor = isSelected ? Colors.white : unselectedColor;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            gradient: isSelected
-                ? LinearGradient(colors: activeGradient)
-                : null,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    final c = context.colors;
+    final toneText = _isFor ? c.positiveText : c.negativeText;
+    final toneBg = _isFor ? c.positiveBg : c.negativeBg;
+    final borderColor = isSelected ? toneText : c.border;
+    final borderWidth = isSelected ? 1.5 : 1.0;
+
+    // AppCard has no border-width parameter, so the (animated) border is
+    // drawn here and the card itself is rendered borderless inside it.
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: label,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          borderRadius: AppRadius.lgAll,
+          border: Border.all(color: borderColor, width: borderWidth),
+        ),
+        child: AppCard(
+          showBorder: false,
+          radius: BorderRadius.circular(AppRadius.lg - 1.5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[
-                Icon(icon, size: 17, color: contentColor),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: contentColor,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppIconTile(
+                    icon: icon ?? AppIcons.forStance(label, filled: true),
+                    color: toneText,
+                    background: toneBg,
+                    size: 56,
+                    iconSize: 28,
+                  ),
+                  const Spacer(),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeOutCubic,
+                    child: isSelected
+                        ? Icon(
+                            AppIcons.checkCircle,
+                            key: const ValueKey('on'),
+                            size: 22,
+                            color: toneText,
+                          )
+                        : Container(
+                            key: const ValueKey('off'),
+                            width: 18,
+                            height: 18,
+                            margin: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: c.borderStrong,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
               ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(label, style: context.text.titleMedium),
+              if (description != null) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  description!,
+                  style: context.text.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ],
           ),
         ),
@@ -59,14 +113,3 @@ class StanceButton extends StatelessWidget {
     );
   }
 }
-
-// Convenience preset gradients used in HomeScreen
-const List<Color> kStanceForGradient = [
-  AppColors.success,
-  AppColors.successAlt,
-];
-
-const List<Color> kStanceAgainstGradient = [
-  AppColors.error,
-  AppColors.errorAlt,
-];
