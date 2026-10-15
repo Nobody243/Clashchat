@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/avatar_option.dart';
 import '../ui/ui.dart';
 import '../widgets/avatar_card.dart';
@@ -37,12 +36,17 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600
+    final c = context.colors;
+    final columns = context.isCompact
         ? 2
-        : (screenWidth > ResponsiveLayout.desktopBreakpoint ? 4 : 3);
+        : context.isMedium
+            ? 3
+            : 4;
+    final gutter = context.pageGutter;
 
     return Scaffold(
+      backgroundColor: c.background,
+      extendBody: true,
       appBar: AppBar(
         title: const Text('Choose your avatar'),
         leading: AppIconButton(
@@ -51,69 +55,118 @@ class _AvatarPickerScreenState extends State<AvatarPickerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+      body: Builder(
+        builder: (context) {
+          // With `extendBody` the bar height arrives as bottom padding; keep
+          // it inside the scroll content so the grid slides under the glass.
+          final bottomInset = MediaQuery.paddingOf(context).bottom;
+          return AppPage(
+            width: AppPageWidth.content,
+            topSafe: false,
+            bottomSafe: false,
+            padding: EdgeInsets.fromLTRB(
+              gutter,
+              AppSpacing.lg,
+              gutter,
+              AppSpacing.xxl + bottomInset,
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.gutter,
-                      AppSpacing.lg,
-                      AppSpacing.gutter,
-                      AppSpacing.xxl,
-                    ),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: AppSpacing.md,
-                      mainAxisSpacing: AppSpacing.md,
-                      childAspectRatio: 0.9,
-                    ),
-                    itemCount: kAvatars.length,
-                    itemBuilder: (_, i) {
-                      final avatar = kAvatars[i];
-                      return AppReveal(
-                        index: i,
-                        child: AvatarCard(
-                          avatar: avatar,
-                          isSelected: _selected == avatar.seed,
-                          onTap: () => setState(() => _selected = avatar.seed),
-                        ),
-                      );
-                    },
-                  ),
+                Text(
+                  'Pick a face for the arena. You can change it any time.',
+                  style: context.text.bodySmall,
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.gutter,
-                    AppSpacing.md,
-                    AppSpacing.gutter,
-                    AppSpacing.xl,
+                AppSpacing.vLg,
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    crossAxisSpacing: AppSpacing.md,
+                    mainAxisSpacing: AppSpacing.md,
+                    childAspectRatio: 0.9,
                   ),
-                  child: Row(
-                    children: [
-                      AppButton.secondary(
-                        label: 'Shuffle',
-                        icon: AppIcons.shuffle,
-                        expand: false,
-                        onPressed: _shuffle,
+                  itemCount: kAvatars.length,
+                  itemBuilder: (_, i) {
+                    final avatar = kAvatars[i];
+                    return AppReveal(
+                      index: i,
+                      child: AvatarCard(
+                        avatar: avatar,
+                        isSelected: _selected == avatar.seed,
+                        onTap: () => setState(() => _selected = avatar.seed),
                       ),
-                      AppSpacing.hMd,
-                      Expanded(
-                        child: AppButton.primary(
-                          label: 'Use this avatar',
-                          onPressed: _selected == null
-                              ? null
-                              : () => Navigator.pop(context, _selected),
-                        ),
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ],
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: _PickerBar(
+        onShuffle: _shuffle,
+        onConfirm:
+            _selected == null ? null : () => Navigator.pop(context, _selected),
+      ),
+    );
+  }
+}
+
+/// Frosted action bar pinned to the bottom; the grid scrolls under it.
+class _PickerBar extends StatelessWidget {
+  const _PickerBar({required this.onShuffle, required this.onConfirm});
+
+  final VoidCallback onShuffle;
+  final VoidCallback? onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final gutter = context.pageGutter;
+    return DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: c.border)),
+      ),
+      child: GlassBar(
+        bottomBorder: false,
+        padding: EdgeInsets.zero,
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxWidth: AppPageWidth.content.maxWidth),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  gutter,
+                  AppSpacing.md,
+                  gutter,
+                  AppSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AppButton.secondary(
+                        label: 'Shuffle',
+                        icon: AppIcons.shuffle,
+                        onPressed: onShuffle,
+                      ),
+                    ),
+                    AppSpacing.hMd,
+                    Expanded(
+                      flex: 2,
+                      child: AppButton.primary(
+                        label: 'Use this avatar',
+                        icon: AppIcons.check,
+                        onPressed: onConfirm,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

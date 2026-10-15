@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/debate_mode.dart';
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
@@ -36,114 +35,49 @@ class RankedSetupScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(AuthService.currentUser!.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final waiting = snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData;
+        final points = snapshot.data?.data()?['rankPoints'] ?? 0;
+        final rank = RankModel.getRankFromPoints(points);
+        final rankData = RankModel.rankData[rank]!;
+        final rankName = rankData['name'] as String;
+        final rankColor = Color(rankData['color'] as int);
+        final win = RankModel.calculatePointsEarned(100, true);
+        final loss = RankModel.calculatePointsEarned(0, true);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const SetupBackButton(),
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(AuthService.currentUser!.uid)
-              .snapshots(),
-          builder: (context, snapshot) {
-            final waiting =
-                snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData;
-            final points = snapshot.data?.data()?['rankPoints'] ?? 0;
-            final rank = RankModel.getRankFromPoints(points);
-            final rankData = RankModel.rankData[rank]!;
-            final rankName = rankData['name'] as String;
-            final rankColor = Color(rankData['color'] as int);
-
-            final column = _buildColumn(
-              context,
-              waiting: waiting,
-              rank: rank,
-              rankName: rankName,
-              rankColor: rankColor,
-            );
-
-            if (!isDesktop) return column;
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Flexible(
-                      flex: 5,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        child: column,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.xxxl),
-                    Flexible(
-                      flex: 3,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
-                        child: const _HowRankedWorksPanel(),
-                      ),
-                    ),
-                  ],
-                ),
+        return SetupScaffold(
+          step: 3,
+          title: 'Ranked debate',
+          subtitle: 'The terms are fixed. Your rank sets the opponent.',
+          summary: SetupSummary(
+            topic: topic,
+            stance: stance,
+            difficulty: waiting ? null : rankName,
+            timer: '10:00',
+          ),
+          cta: AppButton.primary(
+            label: 'Start ranked debate',
+            icon: AppIcons.ranked,
+            onPressed: waiting ? null : () => _start(context, rankName),
+          ),
+          children: [
+            if (waiting)
+              const _OpponentSkeleton()
+            else
+              _OpponentHero(
+                rank: rank,
+                rankName: rankName,
+                rankColor: rankColor,
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildColumn(
-    BuildContext context, {
-    required bool waiting,
-    required DebateRank rank,
-    required String rankName,
-    required Color rankColor,
-  }) {
-    final c = context.colors;
-    final win = RankModel.calculatePointsEarned(100, true);
-    final loss = RankModel.calculatePointsEarned(0, true);
-
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.xxl,
-            ),
-            child: StaggeredColumn(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const AppOverline('Step 3 of 3'),
-                const SizedBox(height: AppSpacing.sm),
-                Text('Ranked debate', style: context.text.headlineMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'The terms are fixed. Your rank sets the opponent.',
-                  style: context.text.bodyMedium?.copyWith(
-                    color: c.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                if (waiting)
-                  const _OpponentSkeleton()
-                else
-                  _OpponentCard(
-                    rank: rank,
-                    rankName: rankName,
-                    rankColor: rankColor,
-                  ),
-                const SizedBox(height: AppSpacing.xxl),
                 const AppSectionHeader(title: 'Match rules'),
                 AppListGroup(
                   children: [
@@ -162,14 +96,7 @@ class RankedSetupScreen extends StatelessWidget {
                     _RuleRow(
                       icon: AppIcons.topic,
                       label: 'Topic',
-                      trailing: Text(
-                        topic,
-                        style: context.text.bodyMedium,
-                        textAlign: TextAlign.end,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailingFlex: true,
+                      subtitle: topic,
                     ),
                     _RuleRow(
                       icon: AppIcons.forStance(stance),
@@ -178,37 +105,25 @@ class RankedSetupScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xxl),
-                _PointsCard(win: win, loss: loss),
               ],
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.gutter,
-            AppSpacing.md,
-            AppSpacing.gutter,
-            AppSpacing.gutter,
-          ),
-          child: AppButton.primary(
-            label: 'Start ranked debate',
-            icon: AppIcons.ranked,
-            onPressed: waiting ? null : () => _start(context, rankName),
-          ),
-        ),
-      ],
+            _PointsCard(win: win, loss: loss),
+          ],
+        );
+      },
     );
   }
 }
 
-/// "Opponent calibrated to {Rank}" with the rank's icon and colour.
-class _OpponentCard extends StatelessWidget {
+/// "Opponent calibrated to {Rank}": rank tile, title, explainer, and a soft
+/// rank-coloured wash in the top-right corner. The wash is the one place in
+/// the setup flow a radial gradient is allowed (DESIGN.md §9).
+class _OpponentHero extends StatelessWidget {
   final DebateRank rank;
   final String rankName;
   final Color rankColor;
 
-  const _OpponentCard({
+  const _OpponentHero({
     required this.rank,
     required this.rankName,
     required this.rankColor,
@@ -217,28 +132,56 @@ class _OpponentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      child: Row(
+      clip: true,
+      padding: EdgeInsets.zero,
+      child: Stack(
         children: [
-          AppIconTile(
-            icon: AppIcons.forRank(rank),
-            color: rankColor,
-            background: rankColor.withValues(alpha: 0.12),
-            size: 52,
-            iconSize: 26,
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Opponent calibrated to $rankName',
-                  style: context.text.titleSmall,
+          Positioned(
+            top: -90,
+            right: -90,
+            child: IgnorePointer(
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      rankColor.withValues(alpha: 0.14),
+                      rankColor.withValues(alpha: 0),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  'ClashBot debates at the level of your current rank. Climb, and it sharpens with you.',
-                  style: context.text.bodySmall,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Row(
+              children: [
+                AppIconTile(
+                  icon: AppIcons.forRank(rank),
+                  color: rankColor,
+                  background: rankColor.withValues(alpha: 0.12),
+                  size: 56,
+                  iconSize: 28,
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Opponent calibrated to $rankName',
+                        style: context.text.titleMedium,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'ClashBot debates at the level of your current rank. Climb, and it sharpens with you.',
+                        style: context.text.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -257,13 +200,13 @@ class _OpponentSkeleton extends StatelessWidget {
     return const AppCard(
       child: Row(
         children: [
-          AppSkeleton.block(width: 52, height: 52),
+          AppSkeleton.block(width: 56, height: 56),
           SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppSkeleton.line(width: 200, height: 14),
+                AppSkeleton.line(width: 220, height: 16),
                 SizedBox(height: AppSpacing.sm),
                 AppSkeleton.line(height: 12),
                 SizedBox(height: AppSpacing.xs),
@@ -277,49 +220,41 @@ class _OpponentSkeleton extends StatelessWidget {
   }
 }
 
-/// A fixed-rule row: leading icon, label, trailing value.
+/// A fixed-rule row: small tile, label, and either a trailing value or a
+/// wrapped subtitle (for long text such as the topic).
 class _RuleRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Widget trailing;
-
-  /// When true the trailing widget takes the remaining width (long text).
-  final bool trailingFlex;
+  final Widget? trailing;
+  final String? subtitle;
 
   const _RuleRow({
     required this.icon,
     required this.label,
-    required this.trailing,
-    this.trailingFlex = false,
+    this.trailing,
+    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.md,
+    return AppListRow(
+      showChevron: false,
+      title: label,
+      subtitle: subtitle,
+      leading: AppIconTile(
+        icon: icon,
+        size: 36,
+        iconSize: 18,
+        color: c.textSecondary,
+        background: c.surfaceRaised,
       ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: c.textSecondary),
-          const SizedBox(width: AppSpacing.md),
-          Text(label, style: context.text.bodyMedium),
-          const SizedBox(width: AppSpacing.lg),
-          if (trailingFlex)
-            Expanded(child: trailing)
-          else ...[
-            const Spacer(),
-            trailing,
-          ],
-        ],
-      ),
+      trailing: trailing,
     );
   }
 }
 
-/// Win / loss extremes side by side.
+/// Win / loss extremes side by side; the numbers count up on first appearance.
 class _PointsCard extends StatelessWidget {
   final int win;
   final int loss;
@@ -341,25 +276,36 @@ class _PointsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: _PointsColumn(
-                  caption: 'Win, up to',
-                  value: '+$win',
-                  color: c.positiveText,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _PointsColumn(
+                    caption: 'Win, up to',
+                    child: AnimatedNumber(
+                      value: win,
+                      signed: true,
+                      color: c.positiveText,
+                      size: 28,
+                    ),
+                  ),
                 ),
-              ),
-              Container(width: 1, height: 44, color: c.border),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: _PointsColumn(
-                  caption: 'Loss, down to',
-                  value: '$loss',
-                  color: c.negativeText,
+                const SizedBox(width: AppSpacing.lg),
+                Container(width: 1, color: c.border),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: _PointsColumn(
+                    caption: 'Loss, down to',
+                    child: AnimatedNumber(
+                      value: loss,
+                      color: c.negativeText,
+                      size: 28,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -374,101 +320,20 @@ class _PointsCard extends StatelessWidget {
 
 class _PointsColumn extends StatelessWidget {
   final String caption;
-  final String value;
-  final Color color;
+  final Widget child;
 
-  const _PointsColumn({
-    required this.caption,
-    required this.value,
-    required this.color,
-  });
+  const _PointsColumn({required this.caption, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(caption, style: context.text.bodySmall),
+        Text(caption, style: context.text.labelSmall),
         const SizedBox(height: AppSpacing.xs),
-        Text(value, style: context.mono(size: 24, color: color)),
+        child,
       ],
-    );
-  }
-}
-
-/// Desktop side panel: what makes ranked different.
-class _HowRankedWorksPanel extends StatelessWidget {
-  const _HowRankedWorksPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
-      child: AppReveal(
-        index: 3,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AppOverline('How ranked works'),
-            const SizedBox(height: AppSpacing.md),
-            const AppListGroup(
-              children: [
-                _InfoRow(
-                  icon: AppIcons.timer,
-                  title: 'Ten minutes, always',
-                  description: 'Every ranked debate runs on the same clock.',
-                ),
-                _InfoRow(
-                  icon: AppIcons.ranked,
-                  title: 'Your rank sets the bar',
-                  description: 'Higher ranks face a sharper opponent.',
-                ),
-                _InfoRow(
-                  icon: AppIcons.points,
-                  title: 'Points follow your score',
-                  description: 'Win big to climb fast; a weak showing costs points.',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-
-  const _InfoRow({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconTile(icon: icon, size: 40, iconSize: 20),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.text.titleSmall),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(description, style: context.text.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

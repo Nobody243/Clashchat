@@ -4,8 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/avatar_option.dart';
 import '../ui/ui.dart';
 
-/// Selectable avatar tile for the picker grid. The selected card gets an
-/// accent border and a small check in the top-right corner.
+/// Selectable avatar tile for the picker grid. The selected card draws its
+/// accent hairline, a 2 px accent ring around the avatar and a small check.
 class AvatarCard extends StatelessWidget {
   final AvatarOption avatar;
   final bool isSelected;
@@ -23,8 +23,8 @@ class AvatarCard extends StatelessWidget {
     final c = context.colors;
     return AppCard(
       onTap: onTap,
+      selected: isSelected,
       padding: const EdgeInsets.all(AppSpacing.md),
-      borderColor: isSelected ? c.accent : null,
       child: Stack(
         children: [
           Column(
@@ -34,14 +34,31 @@ class AvatarCard extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (context, box) {
                       final side = box.biggest.shortestSide;
-                      return ClipOval(
-                        child: SvgPicture.network(
-                          avatar.url,
-                          width: side,
-                          height: side,
-                          fit: BoxFit.cover,
-                          placeholderBuilder: (_) =>
-                              AppSkeleton.circle(size: side),
+                      final inner = side - 8;
+                      return AnimatedContainer(
+                        duration: AppDurations.fast,
+                        curve: Curves.easeOutCubic,
+                        width: side,
+                        height: side,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? c.accent
+                                : c.accent.withValues(alpha: 0),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: SvgPicture.network(
+                            avatar.url,
+                            width: inner,
+                            height: inner,
+                            fit: BoxFit.cover,
+                            placeholderBuilder: (_) =>
+                                AppSkeleton.circle(size: inner),
+                          ),
                         ),
                       );
                     },

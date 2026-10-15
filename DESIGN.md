@@ -81,6 +81,20 @@ All components live in `lib/ui`. Screens compose them; screens do not invent new
 
 Lucide icons via `lucide_icons_flutter`. The regular stroke is the default; the 600-weight stroke (`*Filled` names) marks the selected navigation item and rank emblems. Mapped once in `lib/ui/app_icons.dart`; screens never reference `Icons.*` or `LucideIcons.*` directly.
 
+## 9. Atmosphere, Depth & Motion (v2)
+
+The first pass set tokens and structure. This layer is what makes it feel made.
+
+- **Backdrop** (`AppBackdrop`): every page sits on the canvas plus two or three slow "stage lights" (brass 11 %, sky 6 %, terracotta 4.5 %, drifting over ~22 s) and a fine film grain (4.5 % white in dark, 3.5 % black in light). Never a visible blob, never neon: at arm's length it reads as a lit room, not a gradient.
+- **Glass** (`GlassCard`, `GlassBar`): blur 16–18, fill 72 % (dark) / 80 % (light), hairline, 1 px top highlight. Used for the login card on desktop, floating headers over scrolling content, the scoring overlay and bottom sheets. Not for ordinary cards.
+- **Numbers move** (`AnimatedNumber`): points, scores and counts count up in the mono face on first appearance.
+- **Big moments** (`ParticleBurst`): a short fall of brass/sage/sky flecks for a score of 70+ or positive ranked points. Once, never looping.
+- **Hover** (web/desktop): cards lift 2 px with a brighter hairline and softer shadow; rows tint accent-soft; buttons brighten 6 %. Touch gets press-scale + a light haptic instead.
+- **Choreography**: screens enter as one staggered reveal (40 ms per block). Page transitions fade-forward. The splash is the brand animation: the two bubbles fly in and clash, ring + sparks, wordmark cascades letter by letter.
+- **Layout classes** (`AppPage`, `AppBreakpoints`): compact < 600 (bottom nav, single column), medium 600–899 (navigation rail, two columns allowed), expanded 900–1199 (sidebar, bento), large ≥ 1200 (sidebar, bento, 1180 max). Content widths: form 560, content 880, wide 1180. Gutters 20 / 24 / 48.
+- **Bento** (`Bento`): dashboards are mosaics on wide screens (rank hero 2×, usage 1×, modes, recent debates) and a single priority-ordered column on phones. Rows are intrinsic-height so tiles align.
+- **Mobile is primary**: safe areas everywhere, keyboard-aware composers, 44 px targets, bottom sheets with drag handles, blurred bottom nav, pull-to-refresh on lists. Desktop adds, never replaces.
+
 ## 8. Anti-Patterns (Banned)
 
 - Emoji anywhere in UI.

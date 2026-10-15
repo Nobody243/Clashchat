@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../core/responsive_layout.dart';
 import '../ui/ui.dart';
 
-/// Centers page content at [maxWidth] with generous padding on wide desktop
-/// layouts; on narrower widths it returns [child] untouched so the caller's
-/// own gutter applies (DESIGN.md §5).
+/// Centers page content at [maxWidth] with the responsive page gutter on
+/// sidebar layouts (expanded and large, ≥ 900); on narrower widths it
+/// returns [child] untouched so the caller's own gutter applies
+/// (DESIGN.md §5, §9).
 class DesktopPageShell extends StatelessWidget {
   final Widget child;
   final double maxWidth;
@@ -18,18 +18,15 @@ class DesktopPageShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWideDesktop =
-        screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+    if (context.isCompact || context.isMedium) return child;
 
-    if (!isWideDesktop) return child;
-
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.huge,
+          padding: EdgeInsets.symmetric(
+            horizontal: context.pageGutter,
             vertical: AppSpacing.xxxl,
           ),
           child: child,

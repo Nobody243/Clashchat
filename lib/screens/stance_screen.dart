@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/debate_mode.dart';
 import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
@@ -23,6 +21,8 @@ class StanceScreen extends StatefulWidget {
 class _StanceScreenState extends State<StanceScreen> {
   bool _isFor = true;
 
+  String get _stance => _isFor ? 'For' : 'Against';
+
   String get _ctaLabel => switch (widget.mode) {
         DebateMode.learning => 'Start learning session',
         DebateMode.ranked => 'Continue to ranked setup',
@@ -31,7 +31,6 @@ class _StanceScreenState extends State<StanceScreen> {
 
   void _select(bool isFor) {
     if (_isFor == isFor) return;
-    HapticFeedback.selectionClick();
     setState(() => _isFor = isFor);
   }
 
@@ -71,49 +70,8 @@ class _StanceScreenState extends State<StanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
+    final sideBySide = !context.isCompact;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const SetupBackButton(),
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
-        child: isDesktop ? _buildDesktop() : _buildColumn(sideBySide: false),
-      ),
-    );
-  }
-
-  Widget _buildDesktop() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Flexible(
-              flex: 5,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: _buildColumn(sideBySide: true),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xxxl),
-            Flexible(
-              flex: 3,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: _TipsPanel(isFor: _isFor),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildColumn({required bool sideBySide}) {
     final forCard = StanceButton(
       label: 'For',
       description: 'You argue in favour',
@@ -127,63 +85,46 @@ class _StanceScreenState extends State<StanceScreen> {
       onTap: () => _select(false),
     );
 
-    return Column(
+    return SetupScaffold(
+      step: 2,
+      title: 'Choose your side',
+      subtitle: 'You hold this position for the whole debate.',
+      summary: SetupSummary(topic: widget.topic, stance: _stance),
+      cta: AppButton.primary(
+        label: _ctaLabel,
+        trailingIcon: AppIcons.forward,
+        onPressed: _nextStep,
+      ),
       children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.xxl,
-            ),
-            child: StaggeredColumn(
-              children: [
-                const AppOverline('Step 2 of 3'),
-                const SizedBox(height: AppSpacing.sm),
-                Text('Choose your side', style: context.text.headlineMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'You hold this position for the whole debate.',
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.colors.textSecondary,
-                  ),
+        _TopicCard(topic: widget.topic),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (sideBySide)
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: forCard),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(child: againstCard),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.xxl),
-                _TopicCard(topic: widget.topic),
-                const SizedBox(height: AppSpacing.lg),
-                if (sideBySide)
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: forCard),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(child: againstCard),
-                      ],
-                    ),
-                  )
-                else ...[
-                  forCard,
-                  const SizedBox(height: AppSpacing.md),
-                  againstCard,
-                ],
-              ],
+              )
+            else ...[
+              forCard,
+              const SizedBox(height: AppSpacing.md),
+              againstCard,
+            ],
+            const SizedBox(height: AppSpacing.md),
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.xs),
+              child: Text(
+                'ClashBot takes the other side.',
+                style: context.text.labelSmall,
+              ),
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.gutter,
-            AppSpacing.md,
-            AppSpacing.gutter,
-            AppSpacing.gutter,
-          ),
-          child: AppButton.primary(
-            label: _ctaLabel,
-            trailingIcon: AppIcons.forward,
-            onPressed: _nextStep,
-          ),
+          ],
         ),
       ],
     );
@@ -206,7 +147,13 @@ class _TopicCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(AppIcons.topic, size: 20, color: c.textSecondary),
+          AppIconTile(
+            icon: AppIcons.topic,
+            size: 36,
+            iconSize: 18,
+            color: c.textSecondary,
+            background: c.surface,
+          ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
@@ -214,82 +161,6 @@ class _TopicCard extends StatelessWidget {
               style: context.text.bodyMedium,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Desktop side panel with three short tips, the first following the stance.
-class _TipsPanel extends StatelessWidget {
-  final bool isFor;
-  const _TipsPanel({required this.isFor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
-      child: AppReveal(
-        index: 3,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AppOverline('Debate tips'),
-            const SizedBox(height: AppSpacing.md),
-            AppListGroup(
-              children: [
-                _TipRow(
-                  icon: AppIcons.coachTip,
-                  title: isFor ? 'Arguing for' : 'Arguing against',
-                  tip: isFor
-                      ? 'Lead with benefits, back claims with evidence and offer solutions.'
-                      : 'Question assumptions, raise counterpoints and name the risks.',
-                ),
-                const _TipRow(
-                  icon: AppIcons.document,
-                  title: 'Structure',
-                  tip: 'A clear thesis, two or three supported points, a strong close.',
-                ),
-                const _TipRow(
-                  icon: AppIcons.timer,
-                  title: 'Pace',
-                  tip: 'Think before you type. Quality beats volume.',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TipRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String tip;
-
-  const _TipRow({required this.icon, required this.title, required this.tip});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconTile(icon: icon, size: 40, iconSize: 20),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.text.titleSmall),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(tip, style: context.text.bodySmall),
-              ],
             ),
           ),
         ],

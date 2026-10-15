@@ -2,7 +2,7 @@
 
 import '../ui/ui.dart';
 
-/// Compact stat: a small icon tile and a label on a raised surface.
+/// Compact stat: a raised pill with a 24 px icon tile and a label.
 class StatChip extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -20,15 +20,16 @@ class StatChip extends StatelessWidget {
     final c = context.colors;
     final ic = iconColor ?? c.accent;
     return Container(
+      height: 36,
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.sm,
+        AppSpacing.xs + 2,
+        0,
         AppSpacing.md,
-        AppSpacing.sm,
+        0,
       ),
       decoration: BoxDecoration(
         color: c.surfaceRaised,
-        borderRadius: AppRadius.mdAll,
+        borderRadius: AppRadius.pillAll,
         border: Border.all(color: c.border),
       ),
       child: Row(
@@ -37,14 +38,16 @@ class StatChip extends StatelessWidget {
           AppIconTile(
             icon: icon,
             color: ic,
-            background: ic.withValues(alpha: 0.12),
+            background: ic.withValues(alpha: 0.14),
             size: 24,
             iconSize: 14,
-            radius: AppRadius.smAll,
+            radius: AppRadius.pillAll,
           ),
           AppSpacing.hSm,
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: context.text.labelMedium?.copyWith(color: c.textSecondary),
           ),
         ],

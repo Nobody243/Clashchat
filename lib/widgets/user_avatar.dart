@@ -4,7 +4,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../ui/ui.dart';
 
 /// Dicebear SVG avatar in a circle, optionally wrapped in a 2 px ring
-/// (DESIGN.md §4: the ring takes the user's rank color).
+/// (DESIGN.md §4: the ring takes the user's rank color). Shows a skeleton
+/// while the picture loads. Pass [onTap] to make it tappable (press scale
+/// and haptic on touch, pointer cursor on desktop).
 class UserAvatar extends StatelessWidget {
   final String seed;
   final double size;
@@ -12,6 +14,8 @@ class UserAvatar extends StatelessWidget {
   /// When set, draws a ring of this color around the avatar.
   final Color? ringColor;
   final double ringWidth;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
 
   const UserAvatar({
     super.key,
@@ -19,6 +23,8 @@ class UserAvatar extends StatelessWidget {
     this.size = 40,
     this.ringColor,
     this.ringWidth = 2,
+    this.onTap,
+    this.semanticLabel,
   });
 
   String get _effectiveSeed {
@@ -57,17 +63,26 @@ class UserAvatar extends StatelessWidget {
       ),
     );
 
-    if (!hasRing) return SizedBox(width: size, height: size, child: picture);
+    Widget avatar = hasRing
+        ? Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: ringColor!, width: ringWidth),
+            ),
+            child: picture,
+          )
+        : SizedBox(width: size, height: size, child: picture);
 
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: ringColor!, width: ringWidth),
-      ),
-      child: picture,
+    if (onTap == null) return avatar;
+
+    return Pressable(
+      onTap: onTap,
+      pressedScale: 0.94,
+      semanticLabel: semanticLabel ?? 'Avatar',
+      child: avatar,
     );
   }
 }

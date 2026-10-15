@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
 import '../ui/ui.dart';
-import '../widgets/desktop_page_shell.dart';
 import '../widgets/user_avatar.dart';
 import 'avatar_picker_screen.dart';
 import 'change_password_screen.dart';
@@ -20,8 +18,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const double _maxWidth = 640;
-
   final _nameCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   bool _editMode = false;
@@ -137,243 +133,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     final uid = AuthService.currentUser?.uid ?? '';
     final email = AuthService.currentUser?.email ?? '';
+    final compact = context.isCompact;
+    final twoColumn = context.isExpanded || context.isLarge;
+    final gutter = context.pageGutter;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
-    final isWideDesktop =
-        screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+    return AppPage(
+      width: AppPageWidth.wide,
+      bottomSafe: false,
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        compact ? AppSpacing.xl : AppSpacing.xxl,
+        gutter,
+        AppSpacing.xxxl + bottomInset,
+      ),
+      child: StreamBuilder<DocumentSnapshot>(
+        stream:
+            FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        builder: (context, userSnap) {
+          final loading =
+              userSnap.connectionState == ConnectionState.waiting &&
+                  !userSnap.hasData;
+          final userData =
+              userSnap.data?.data() as Map<String, dynamic>? ?? {};
+          final rankPoints = (userData['rankPoints'] as num?)?.toInt() ?? 0;
+          final rank = RankModel.getRankFromPoints(rankPoints);
+          final rankData = RankModel.rankData[rank]!;
+          final rankColor = Color(rankData['color'] as int);
+          final displayName = userData['displayName'] as String? ?? 'Debater';
+          final bio = userData['bio'] as String? ?? '';
+          final avatarSeed = userData['avatarSeed'] as String? ??
+              userData['photoUrl'] as String?;
 
-    return ColoredBox(
-      color: c.background,
-      child: SafeArea(
-        top: !isDesktop,
-        child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .snapshots(),
-          builder: (context, userSnap) {
-            final loading =
-                userSnap.connectionState == ConnectionState.waiting &&
-                !userSnap.hasData;
-            final userData =
-                userSnap.data?.data() as Map<String, dynamic>? ?? {};
-            final rankPoints = (userData['rankPoints'] as num?)?.toInt() ?? 0;
-            final rank = RankModel.getRankFromPoints(rankPoints);
-            final rankData = RankModel.rankData[rank]!;
-            final rankColor = Color(rankData['color'] as int);
-            final displayName = userData['displayName'] as String? ?? 'Debater';
-            final bio = userData['bio'] as String? ?? '';
-            final avatarSeed = userData['avatarSeed'] as String? ??
-                userData['photoUrl'] as String?;
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('debates')
+                .doc(uid)
+                .collection('history')
+                .snapshots(),
+            builder: (context, debatesSnap) {
+              final debates = debatesSnap.data?.docs ?? [];
+              final totalDebates = debates.length;
+              final wins = debates.where((d) {
+                final data = d.data() as Map<String, dynamic>;
+                return (data['score'] ?? 0) >= 50;
+              }).length;
+              final avgScore = totalDebates == 0
+                  ? 0
+                  : (debates.fold<int>(0, (acc, d) {
+                            final data = d.data() as Map<String, dynamic>;
+                            return acc + ((data['score'] ?? 0) as int);
+                          }) /
+                          totalDebates)
+                      .round();
 
-            return StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('debates')
-                  .doc(uid)
-                  .collection('history')
-                  .snapshots(),
-              builder: (context, debatesSnap) {
-                final debates = debatesSnap.data?.docs ?? [];
-                final totalDebates = debates.length;
-                final wins = debates.where((d) {
-                  final data = d.data() as Map<String, dynamic>;
-                  return (data['score'] ?? 0) >= 50;
-                }).length;
-                final avgScore = totalDebates == 0
-                    ? 0
-                    : (debates.fold<int>(0, (acc, d) {
-                              final data = d.data() as Map<String, dynamic>;
-                              return acc + ((data['score'] ?? 0) as int);
-                            }) /
-                            totalDebates)
-                        .round();
+              if (loading) return _ProfileSkeleton(twoColumn: twoColumn);
 
-                final content = loading
-                    ? const _ProfileSkeleton()
-                    : StaggeredColumn(
-                        children: [
-                          _ProfileHeader(
-                            displayName: displayName,
-                            email: email,
-                            rank: rank,
-                            rankColor: rankColor,
-                            avatarSeed: avatarSeed,
-                            onTapAvatar: () => _pickAvatar(avatarSeed),
+              final hero = _ProfileHero(
+                displayName: displayName,
+                email: email,
+                bio: _editMode ? '' : bio,
+                rank: rank,
+                rankColor: rankColor,
+                points: rankPoints,
+                avatarSeed: avatarSeed,
+                onTapAvatar: () => _pickAvatar(avatarSeed),
+              );
+
+              final stats = _StatsRow(
+                debates: totalDebates,
+                avgScore: avgScore,
+                wins: wins,
+              );
+
+              final Widget actions = _editMode
+                  ? _EditForm(
+                      nameCtrl: _nameCtrl,
+                      bioCtrl: _bioCtrl,
+                      saving: _saving,
+                      onSave: _saveProfile,
+                      onCancel: _cancelEdit,
+                    )
+                  : _AccountGroup(
+                      onEdit: () => setState(() => _editMode = true),
+                      onChangePassword: _changePassword,
+                      onSignOut: _signOut,
+                    );
+
+              if (twoColumn) {
+                return StaggeredColumn(
+                  children: [
+                    Text('Profile', style: context.text.headlineMedium),
+                    AppSpacing.vXxl,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [hero, AppSpacing.vLg, stats],
                           ),
-                          AppSpacing.vLg,
-                          _RankProgress(points: rankPoints),
-                          if (!_editMode && bio.isNotEmpty) ...[
-                            AppSpacing.vLg,
-                            Text(bio, style: context.text.bodyMedium),
-                          ],
-                          AppSpacing.vXxl,
-                          if (_editMode)
-                            _EditForm(
-                              nameCtrl: _nameCtrl,
-                              bioCtrl: _bioCtrl,
-                              saving: _saving,
-                              onSave: _saveProfile,
-                              onCancel: _cancelEdit,
-                            )
-                          else ...[
-                            Row(
-                              children: [
-                                _StatTile(
-                                  value: '$totalDebates',
-                                  caption: 'Debates',
-                                ),
-                                AppSpacing.hMd,
-                                _StatTile(
-                                  value: '$avgScore',
-                                  caption: 'Avg score',
-                                ),
-                                AppSpacing.hMd,
-                                _StatTile(value: '$wins', caption: 'Wins'),
-                              ],
-                            ),
-                            AppSpacing.vXxl,
-                            const AppSectionHeader(title: 'Account'),
-                            AppListGroup(
-                              children: [
-                                _ActionRow(
-                                  icon: AppIcons.edit,
-                                  label: 'Edit profile',
-                                  onTap: () =>
-                                      setState(() => _editMode = true),
-                                ),
-                                _ActionRow(
-                                  icon: AppIcons.lock,
-                                  label: 'Change password',
-                                  onTap: _changePassword,
-                                ),
-                                _ActionRow(
-                                  icon: AppIcons.signOut,
-                                  label: 'Sign out',
-                                  color: c.negativeText,
-                                  showChevron: false,
-                                  onTap: _signOut,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      );
-
-                if (isWideDesktop) {
-                  return DesktopPageShell(
-                    maxWidth: _maxWidth,
-                    child: SingleChildScrollView(child: content),
-                  );
-                }
-
-                return Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: _maxWidth),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSpacing.gutter,
-                        isDesktop ? AppSpacing.xxxl : AppSpacing.xl,
-                        AppSpacing.gutter,
-                        AppSpacing.xxxl,
-                      ),
-                      child: content,
+                        ),
+                        const SizedBox(width: AppSpacing.xxl),
+                        Expanded(flex: 2, child: actions),
+                      ],
                     ),
-                  ),
+                  ],
                 );
-              },
-            );
-          },
-        ),
+              }
+
+              return StaggeredColumn(
+                children: [
+                  hero,
+                  AppSpacing.vLg,
+                  stats,
+                  AppSpacing.vXxl,
+                  actions,
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }
 }
 
-// ── Header ───────────────────────────────────────────────────────────────────
+// ── Hero ─────────────────────────────────────────────────────────────────────
 
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHero extends StatelessWidget {
   final String displayName;
   final String email;
+  final String bio;
   final DebateRank rank;
   final Color rankColor;
+  final int points;
   final String? avatarSeed;
   final VoidCallback onTapAvatar;
 
-  const _ProfileHeader({
+  const _ProfileHero({
     required this.displayName,
     required this.email,
+    required this.bio,
     required this.rank,
     required this.rankColor,
+    required this.points,
     required this.avatarSeed,
     required this.onTapAvatar,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final rankName = RankModel.rankData[rank]!['name'] as String;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Pressable(
-          onTap: onTapAvatar,
-          pressedScale: 0.96,
-          semanticLabel: 'Change avatar',
-          child: UserAvatar(
-            seed: avatarSeed ?? 'Debater',
-            size: 72,
-            ringColor: rankColor,
-          ),
-        ),
-        AppSpacing.hLg,
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.headlineSmall,
-              ),
-              if (email.isNotEmpty) ...[
-                AppSpacing.vXs,
-                Text(
-                  email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.text.bodySmall,
-                ),
-              ],
-              AppSpacing.vSm,
-              AppPill(
-                label: rankName,
-                icon: AppIcons.forRank(rank),
-                tone: AppPillTone.rank,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Rank progress ────────────────────────────────────────────────────────────
-
-class _RankProgress extends StatelessWidget {
-  final int points;
-
-  const _RankProgress({required this.points});
-
-  String _nextRankLabel(DebateRank rank) {
+  String _nextRankLabel() {
     final ranks = DebateRank.values;
     final idx = ranks.indexOf(rank);
-    if (idx >= ranks.length - 1) return 'Top rank';
+    if (idx >= ranks.length - 1) return 'Top rank reached';
     final next = RankModel.rankData[ranks[idx + 1]]!;
     final remaining = (next['minPoints'] as int) - points;
     return '$remaining pts to ${next['name']}';
@@ -382,60 +297,279 @@ class _RankProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final rank = RankModel.getRankFromPoints(points);
-    final rankColor = Color(RankModel.rankData[rank]!['color'] as int);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final rankName = RankModel.rankData[rank]!['name'] as String;
+    final stackIdentity = context.isCompact;
+
+    final avatar = UserAvatar(
+      seed: avatarSeed ?? 'Debater',
+      size: 88,
+      ringColor: rankColor,
+      onTap: onTapAvatar,
+      semanticLabel: 'Change avatar',
+    );
+
+    final identity = Column(
+      crossAxisAlignment:
+          stackIdentity ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('$points pts', style: context.mono(size: 14)),
-            const Spacer(),
-            Text(
-              _nextRankLabel(rank),
-              style: context.text.labelSmall?.copyWith(color: c.textSecondary),
-            ),
-          ],
+        Text(
+          displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: stackIdentity ? TextAlign.center : TextAlign.start,
+          style: context.text.headlineSmall,
         ),
-        AppSpacing.vSm,
-        AppProgressBar(
-          value: RankModel.getRankProgress(points),
-          color: rankColor,
+        if (email.isNotEmpty) ...[
+          AppSpacing.vXs,
+          Text(
+            email,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodySmall,
+          ),
+        ],
+        AppSpacing.vMd,
+        AppPill(
+          label: rankName,
+          icon: AppIcons.forRank(rank),
+          tone: AppPillTone.rank,
         ),
       ],
+    );
+
+    return AppCard(
+      clip: true,
+      padding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          // Hero wash (DESIGN.md §9): the one allowed radial gradient here.
+          Positioned(
+            top: -100,
+            right: -80,
+            child: IgnorePointer(
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [c.accentSoft, c.accentSoft.withValues(alpha: 0)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (stackIdentity)
+                  Column(
+                    children: [avatar, AppSpacing.vLg, identity],
+                  )
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      avatar,
+                      AppSpacing.hXl,
+                      Expanded(child: identity),
+                    ],
+                  ),
+                if (bio.isNotEmpty) ...[
+                  AppSpacing.vLg,
+                  Text(
+                    bio,
+                    textAlign:
+                        stackIdentity ? TextAlign.center : TextAlign.start,
+                    style: context.text.bodyMedium
+                        ?.copyWith(color: c.textSecondary),
+                  ),
+                ],
+                AppSpacing.vXl,
+                Divider(height: 1, thickness: 1, color: c.border),
+                AppSpacing.vLg,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    AnimatedNumber(value: points, size: 20),
+                    AppSpacing.hXs,
+                    Text(
+                      'pts',
+                      style: context.text.labelMedium
+                          ?.copyWith(color: c.textSecondary),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _nextRankLabel(),
+                      style: context.text.labelSmall
+                          ?.copyWith(color: c.textSecondary),
+                    ),
+                  ],
+                ),
+                AppSpacing.vSm,
+                AppProgressBar(
+                  value: RankModel.getRankProgress(points),
+                  color: rankColor,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 
-class _StatTile extends StatelessWidget {
-  final String value;
-  final String caption;
+class _StatsRow extends StatelessWidget {
+  final int debates;
+  final int avgScore;
+  final int wins;
 
-  const _StatTile({required this.value, required this.caption});
+  const _StatsRow({
+    required this.debates,
+    required this.avgScore,
+    required this.wins,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Bento(
+      gap: AppSpacing.md,
+      // Three small numbers stay side by side even on phones.
+      collapseBelow: 0,
+      rows: [
+        [
+          BentoTile(
+            child: _StatTile(
+              value: debates,
+              caption: 'Debates',
+              icon: AppIcons.messages,
+            ),
+          ),
+          BentoTile(
+            child: _StatTile(
+              value: avgScore,
+              caption: 'Avg score',
+              icon: AppIcons.score,
+            ),
+          ),
+          BentoTile(
+            child: _StatTile(
+              value: wins,
+              caption: 'Wins',
+              icon: AppIcons.ranked,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final int value;
+  final String caption;
+  final IconData icon;
+
+  const _StatTile({
+    required this.value,
+    required this.caption,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Expanded(
-      child: AppCard(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: c.textHint),
+          AppSpacing.vMd,
+          AnimatedNumber(value: value, size: 24),
+          AppSpacing.vXs,
+          Text(
+            caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.labelSmall?.copyWith(color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Account actions ──────────────────────────────────────────────────────────
+
+class _AccountGroup extends StatelessWidget {
+  final VoidCallback onEdit;
+  final VoidCallback onChangePassword;
+  final VoidCallback onSignOut;
+
+  const _AccountGroup({
+    required this.onEdit,
+    required this.onChangePassword,
+    required this.onSignOut,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AppSectionHeader(title: 'Account'),
+        AppListGroup(
           children: [
-            Text(value, style: context.mono(size: 20)),
-            AppSpacing.vXs,
-            Text(
-              caption,
-              style: context.text.labelSmall?.copyWith(color: c.textSecondary),
+            AppListRow(
+              title: 'Edit profile',
+              subtitle: 'Display name and bio',
+              leading: AppIconTile(
+                icon: AppIcons.edit,
+                color: c.textSecondary,
+                background: c.surfaceRaised,
+                size: 36,
+                iconSize: 18,
+                radius: AppRadius.smAll,
+              ),
+              onTap: onEdit,
+            ),
+            AppListRow(
+              title: 'Change password',
+              leading: AppIconTile(
+                icon: AppIcons.lock,
+                color: c.textSecondary,
+                background: c.surfaceRaised,
+                size: 36,
+                iconSize: 18,
+                radius: AppRadius.smAll,
+              ),
+              onTap: onChangePassword,
+            ),
+            AppListRow(
+              title: 'Sign out',
+              titleColor: c.negativeText,
+              leading: AppIconTile(
+                icon: AppIcons.signOut,
+                color: c.negativeText,
+                background: c.negativeBg,
+                size: 36,
+                iconSize: 18,
+                radius: AppRadius.smAll,
+              ),
+              showChevron: false,
+              onTap: onSignOut,
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
@@ -471,6 +605,7 @@ class _EditForm extends StatelessWidget {
                 label: 'Display name',
                 hint: 'Your name',
                 controller: nameCtrl,
+                prefixIcon: AppIcons.user,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
                 enabled: !saving,
@@ -511,107 +646,64 @@ class _EditForm extends StatelessWidget {
   }
 }
 
-// ── Action rows ──────────────────────────────────────────────────────────────
-
-class _ActionRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color? color;
-  final bool showChevron;
-  final VoidCallback onTap;
-
-  const _ActionRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color,
-    this.showChevron = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final fg = color ?? c.textPrimary;
-    return Pressable(
-      onTap: onTap,
-      semanticLabel: label,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        child: Row(
-          children: [
-            AppIconTile(
-              icon: icon,
-              color: color ?? c.textSecondary,
-              background: color == null ? c.surfaceRaised : c.negativeBg,
-              size: 36,
-              iconSize: 18,
-              radius: AppRadius.smAll,
-            ),
-            AppSpacing.hMd,
-            Expanded(
-              child: Text(
-                label,
-                style: context.text.titleSmall?.copyWith(color: fg),
-              ),
-            ),
-            if (showChevron)
-              Icon(AppIcons.forward, size: 18, color: c.textHint),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 
 class _ProfileSkeleton extends StatelessWidget {
-  const _ProfileSkeleton();
+  const _ProfileSkeleton({required this.twoColumn});
+
+  final bool twoColumn;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    Widget block(double h) =>
+        AppSkeleton.block(height: h, radius: AppRadius.lgAll);
+
+    final left = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            const AppSkeleton.circle(size: 72),
-            AppSpacing.hLg,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  AppSkeleton.line(width: 160, height: 24),
-                  SizedBox(height: AppSpacing.sm),
-                  AppSkeleton.line(width: 200, height: 13),
-                  SizedBox(height: AppSpacing.sm),
-                  AppSkeleton(width: 96, height: 28),
-                ],
-              ),
-            ),
-          ],
-        ),
+        block(236),
         AppSpacing.vLg,
-        const AppSkeleton.line(height: 6),
-        AppSpacing.vXxl,
         Row(
           children: [
             for (var i = 0; i < 3; i++) ...[
-              Expanded(
-                child: AppSkeleton.block(height: 76, radius: AppRadius.lgAll),
-              ),
+              Expanded(child: block(104)),
               if (i < 2) AppSpacing.hMd,
             ],
           ],
         ),
-        AppSpacing.vXxl,
+      ],
+    );
+
+    final right = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         const AppSkeleton.line(width: 96, height: 16),
         AppSpacing.vMd,
-        AppSkeleton.block(height: 180, radius: AppRadius.lgAll),
+        block(188),
       ],
+    );
+
+    if (twoColumn) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppSkeleton.line(width: 140, height: 28),
+          AppSpacing.vXxl,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: left),
+              const SizedBox(width: AppSpacing.xxl),
+              Expanded(flex: 2, child: right),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [left, AppSpacing.vXxl, right],
     );
   }
 }

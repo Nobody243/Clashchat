@@ -7,8 +7,12 @@ import 'package:clashchat/core/theme_provider.dart';
 import 'package:clashchat/models/chat_message.dart';
 import 'package:clashchat/models/debate_mode.dart';
 import 'package:clashchat/screens/results_screen.dart';
+import 'package:clashchat/ui/ui.dart';
 
 void main() {
+  // The backdrop's light drift loops forever; freeze it so the tester can settle.
+  AppBackdrop.animationsEnabled = false;
+
   Widget host(Widget child) => ChangeNotifierProvider(
         create: (_) => ThemeProvider(),
         child: MaterialApp(theme: AppTheme.dark(), home: child),

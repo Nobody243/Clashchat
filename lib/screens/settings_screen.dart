@@ -1,174 +1,127 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/responsive_layout.dart';
 import '../core/theme_provider.dart';
 import '../ui/ui.dart';
-import '../widgets/desktop_page_shell.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  static const double _maxWidth = 640;
   static const String _version = '1.0.2';
+
+  static const List<ThemeMode> _modes = [
+    ThemeMode.system,
+    ThemeMode.light,
+    ThemeMode.dark,
+  ];
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > ResponsiveLayout.desktopBreakpoint;
-    final isWideDesktop =
-        screenWidth >= ResponsiveLayout.wideDesktopBreakpoint;
+    final compact = context.isCompact;
+    final gutter = context.pageGutter;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // The appearance control is the one place that reads the theme choice.
+    final themeMode = context.watch<ThemeProvider>().themeMode;
 
-    final content = StaggeredColumn(
-      children: [
-        Text('Settings', style: context.text.headlineMedium),
-        AppSpacing.vXxl,
-        const AppSectionHeader(title: 'Appearance'),
-        AppListGroup(
-          children: [
-            _SettingsRow(
-              icon: AppIcons.moon,
-              title: 'Dark mode',
-              subtitle: 'Arena Night is the default',
-              onTap: () => context.read<ThemeProvider>().toggle(),
-              trailing: Switch(
-                value: context.watch<ThemeProvider>().isDark,
-                onChanged: (_) => context.read<ThemeProvider>().toggle(),
+    return AppPage(
+      width: AppPageWidth.content,
+      bottomSafe: false,
+      padding: EdgeInsets.fromLTRB(
+        gutter,
+        compact ? AppSpacing.xl : AppSpacing.xxl,
+        gutter,
+        AppSpacing.xxxl + bottomInset,
+      ),
+      child: StaggeredColumn(
+        children: [
+          Text('Settings', style: context.text.headlineMedium),
+          AppSpacing.vXxl,
+          const AppSectionHeader(title: 'Appearance'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Theme', style: context.text.titleSmall),
+                AppSpacing.vXs,
+                Text(
+                  'System follows your device. Arena Night is the default.',
+                  style: context.text.bodySmall,
+                ),
+                AppSpacing.vLg,
+                AppSegmented(
+                  labels: const ['System', 'Light', 'Dark'],
+                  icons: const [AppIcons.sparkle, AppIcons.sun, AppIcons.moon],
+                  index: _modes.indexOf(themeMode),
+                  onChanged: (i) =>
+                      context.read<ThemeProvider>().setMode(_modes[i]),
+                ),
+              ],
+            ),
+          ),
+          AppSpacing.vXxl,
+          const AppSectionHeader(title: 'Preferences'),
+          AppListGroup(
+            children: [
+              AppListRow(
+                title: 'Notifications',
+                subtitle: 'Reminders when your daily quota resets',
+                leading: _SettingsIcon(AppIcons.bell),
+                trailing: const AppPill(label: 'Coming soon'),
               ),
-            ),
-          ],
-        ),
-        AppSpacing.vXxl,
-        const AppSectionHeader(title: 'Preferences'),
-        const AppListGroup(
-          children: [
-            _SettingsRow(
-              icon: AppIcons.bell,
-              title: 'Notifications',
-              subtitle: 'Reminders when your daily quota resets',
-              trailing: AppPill(label: 'Coming soon'),
-            ),
-            _SettingsRow(
-              icon: AppIcons.speaker,
-              title: 'Sound effects',
-              subtitle: 'Timer and result cues',
-              trailing: AppPill(label: 'Coming soon'),
-            ),
-          ],
-        ),
-        AppSpacing.vXxl,
-        const AppSectionHeader(title: 'About'),
-        AppListGroup(
-          children: [
-            _SettingsRow(
-              icon: AppIcons.info,
-              title: 'Version',
-              trailing: Text(
-                _version,
-                style: context.mono(size: 12, color: c.textSecondary),
+              AppListRow(
+                title: 'Sound effects',
+                subtitle: 'Timer and result cues',
+                leading: _SettingsIcon(AppIcons.speaker),
+                trailing: const AppPill(label: 'Coming soon'),
               ),
-            ),
-            _SettingsRow(
-              icon: AppIcons.shield,
-              title: 'Privacy policy',
-              onTap: () {},
-            ),
-            _SettingsRow(
-              icon: AppIcons.document,
-              title: 'Terms of service',
-              onTap: () {},
-            ),
-          ],
-        ),
-      ],
-    );
-
-    return ColoredBox(
-      color: c.background,
-      child: SafeArea(
-        top: !isDesktop,
-        child: isWideDesktop
-            ? DesktopPageShell(
-                maxWidth: _maxWidth,
-                child: SingleChildScrollView(child: content),
-              )
-            : Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: _maxWidth),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(
-                      AppSpacing.gutter,
-                      isDesktop ? AppSpacing.xxxl : AppSpacing.xl,
-                      AppSpacing.gutter,
-                      AppSpacing.xxxl,
-                    ),
-                    child: content,
-                  ),
+            ],
+          ),
+          AppSpacing.vXxl,
+          const AppSectionHeader(title: 'About'),
+          AppListGroup(
+            children: [
+              AppListRow(
+                title: 'Version',
+                leading: _SettingsIcon(AppIcons.info),
+                trailing: Text(
+                  _version,
+                  style: context.mono(size: 12, color: c.textSecondary),
                 ),
               ),
+              AppListRow(
+                title: 'Privacy policy',
+                leading: _SettingsIcon(AppIcons.shield),
+                onTap: () {},
+              ),
+              AppListRow(
+                title: 'Terms of service',
+                leading: _SettingsIcon(AppIcons.document),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SettingsRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
+class _SettingsIcon extends StatelessWidget {
+  const _SettingsIcon(this.icon);
 
-  const _SettingsRow({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-  });
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Pressable(
-      onTap: onTap,
-      semanticLabel: title,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        child: Row(
-          children: [
-            AppIconTile(
-              icon: icon,
-              color: c.textSecondary,
-              background: c.surfaceRaised,
-              size: 36,
-              iconSize: 18,
-              radius: AppRadius.smAll,
-            ),
-            AppSpacing.hMd,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: context.text.titleSmall),
-                  if (subtitle != null) ...[
-                    AppSpacing.vXs,
-                    Text(subtitle!, style: context.text.bodySmall),
-                  ],
-                ],
-              ),
-            ),
-            AppSpacing.hMd,
-            if (trailing != null)
-              trailing!
-            else if (onTap != null)
-              Icon(AppIcons.forward, size: 18, color: c.textHint),
-          ],
-        ),
-      ),
+    return AppIconTile(
+      icon: icon,
+      color: c.textSecondary,
+      background: c.surfaceRaised,
+      size: 36,
+      iconSize: 18,
+      radius: AppRadius.smAll,
     );
   }
 }

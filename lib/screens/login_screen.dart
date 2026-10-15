@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../core/responsive_layout.dart';
 import '../services/auth_service.dart';
 import '../services/session_service.dart';
 import '../ui/ui.dart';
 import '../widgets/app_logo.dart';
 import 'home_screen.dart';
 
-/// Sign in / sign up. Calm and editorial: wordmark, one headline, a
-/// segmented control, labelled fields and a single primary action.
+/// Sign in / sign up.
+///
+/// * Phones (< 600): one scrolling column on the atmospheric backdrop: mark +
+///   wordmark, headline, segmented control, fields, CTA.
+/// * Medium (600–899): the same column, 560 wide, vertically centred.
+/// * Expanded (≥ 900): brand panel on the left (45 %) with its own, brighter
+///   backdrop and the three modes; the form in a glass card on the right.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -191,6 +195,20 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _forgotPassword() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final error = await AuthService.sendPasswordReset(_loginEmail.text);
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error ??
+              'If an account exists for that email, a reset link is on its way.',
+        ),
+      ),
+    );
+  }
+
   void _switchTab(int i) {
     if (i != _tab && !_isLoading) setState(() => _tab = i);
   }
@@ -207,8 +225,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isDesktop = width > ResponsiveLayout.desktopBreakpoint;
+    final Widget body;
+    if (context.isCompact) {
+      body = _buildCompact(context);
+    } else if (context.isMedium) {
+      body = _buildMedium(context);
+    } else {
+      body = _buildExpanded(context);
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: Theme.of(context).appBarTheme.systemOverlayStyle ??
@@ -216,108 +240,145 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Scaffold(
         backgroundColor: context.colors.background,
         resizeToAvoidBottomInset: true,
-        body: isDesktop ? _buildDesktop(context) : _buildPhone(context),
+        body: body,
       ),
     );
   }
 
-  Future<void> _forgotPassword() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final error = await AuthService.sendPasswordReset(_loginEmail.text);
-    if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          error ??
-              'If an account exists for that email, a reset link is on its way.',
-        ),
+  /// Phones: top-aligned scrolling column on the backdrop.
+  Widget _buildCompact(BuildContext context) {
+    return AppPage(
+      width: AppPageWidth.form,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.gutter,
+        AppSpacing.xxxl,
+        AppSpacing.gutter,
+        AppSpacing.xxxl,
       ),
-    );
-  }
-
-  Widget _buildPhone(BuildContext context) {
-    return SafeArea(
-      child: Column(
+      child: StaggeredColumn(
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.gutter,
-                40,
-                AppSpacing.gutter,
-                AppSpacing.xxl,
-              ),
-              child: StaggeredColumn(
-                children: [
-                  const _WordmarkRow(),
-                  const SizedBox(height: AppSpacing.xxxl),
-                  _Heading(isSignup: _isSignup),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _SegmentedControl(
-                    index: _tab,
-                    labels: const ['Login', 'Sign up'],
-                    enabled: !_isLoading,
-                    onChanged: _switchTab,
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _buildFields(),
-                  const SizedBox(height: AppSpacing.xxl),
-                  _buildActions(),
-                ],
-              ),
-            ),
-          ),
+          const _WordmarkRow(markSize: 36),
+          const SizedBox(height: AppSpacing.xxxl),
+          _Heading(isSignup: _isSignup),
+          const SizedBox(height: AppSpacing.xxl),
+          _segmented(),
+          const SizedBox(height: AppSpacing.xxl),
+          _buildFields(),
+          const SizedBox(height: AppSpacing.xxl),
+          _buildActions(),
         ],
       ),
     );
   }
 
-  Widget _buildDesktop(BuildContext context) {
+  /// 600–899: the same column, 560 wide and vertically centred.
+  Widget _buildMedium(BuildContext context) {
+    return AppPage(
+      width: AppPageWidth.form,
+      scroll: false,
+      padding: EdgeInsets.zero,
+      child: _CenteredScroll(
+        padding: EdgeInsets.symmetric(
+          horizontal: context.pageGutter,
+          vertical: AppSpacing.huge,
+        ),
+        child: StaggeredColumn(
+          children: [
+            const _WordmarkRow(markSize: 44),
+            const SizedBox(height: AppSpacing.xxxl),
+            _Heading(isSignup: _isSignup),
+            const SizedBox(height: AppSpacing.xxl),
+            _segmented(),
+            const SizedBox(height: AppSpacing.xxl),
+            _buildFields(),
+            const SizedBox(height: AppSpacing.xxl),
+            _buildActions(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// ≥ 900: brand panel (45 %) beside the form in a glass card (55 %).
+  Widget _buildExpanded(BuildContext context) {
     final c = context.colors;
+    final theme = Theme.of(context);
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          flex: 5,
-          child: Container(
-            color: c.inset,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.huge,
-              vertical: AppSpacing.huge,
+          flex: 45,
+          // The brand panel sits on the inset step. AppBackdrop paints the
+          // theme's canvas, so the canvas token is remapped to `inset` for
+          // this subtree only; every other token is untouched.
+          child: Theme(
+            data: theme.copyWith(
+              extensions: <ThemeExtension<dynamic>>[
+                c.copyWith(background: c.inset),
+              ],
             ),
-            child: const _BrandPanel(),
+            child: AppBackdrop(
+              intensity: 1.4,
+              child: SafeArea(
+                child: _CenteredScroll(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.huge,
+                    vertical: AppSpacing.huge,
+                  ),
+                  child: const _BrandPanel(),
+                ),
+              ),
+            ),
           ),
         ),
+        Container(width: 1, color: c.border),
         Expanded(
-          flex: 6,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: SingleChildScrollView(
+          flex: 55,
+          child: AppBackdrop(
+            child: SafeArea(
+              child: _CenteredScroll(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.gutter,
+                  horizontal: AppSpacing.huge,
                   vertical: AppSpacing.huge,
                 ),
-                child: StaggeredColumn(
-                  children: [
-                    _Heading(isSignup: _isSignup),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _SegmentedControl(
-                      index: _tab,
-                      labels: const ['Login', 'Sign up'],
-                      enabled: !_isLoading,
-                      onChanged: _switchTab,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    // The card itself appears at once: a BackdropFilter
+                    // inside a fading layer cannot sample the page behind
+                    // it, so only the contents stagger in.
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(AppSpacing.xxxl),
+                      child: StaggeredColumn(
+                        startIndex: 3,
+                        children: [
+                          _Heading(isSignup: _isSignup),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _segmented(),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _buildFields(),
+                          const SizedBox(height: AppSpacing.xxl),
+                          _buildActions(),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _buildFields(),
-                    const SizedBox(height: AppSpacing.xxl),
-                    _buildActions(),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _segmented() {
+    return AppSegmented(
+      labels: const ['Login', 'Sign up'],
+      index: _tab,
+      enabled: !_isLoading,
+      onChanged: _switchTab,
     );
   }
 
@@ -356,8 +417,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 obscure: true,
                 textInputAction: TextInputAction.done,
                 autofillHints: const [AutofillHints.newPassword],
+                onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _submit(),
               ),
+              const SizedBox(height: AppSpacing.md),
+              _StrengthMeter(password: _signupPass.text),
             ],
           )
         : Column(
@@ -384,13 +448,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 autofillHints: const [AutofillHints.password],
                 onSubmitted: (_) => _submit(),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               Align(
                 alignment: Alignment.centerRight,
-                child: AppButton.ghost(
-                  label: 'Forgot password?',
-                  size: AppButtonSize.small,
-                  onPressed: enabled ? _forgotPassword : null,
+                // 44 px hit target for the small text button.
+                child: SizedBox(
+                  height: 44,
+                  child: AppButton.ghost(
+                    label: 'Forgot password?',
+                    size: AppButtonSize.small,
+                    onPressed: enabled ? _forgotPassword : null,
+                  ),
                 ),
               ),
             ],
@@ -434,18 +502,60 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ── Pieces ──
+// ── Layout helpers ──
 
-class _WordmarkRow extends StatelessWidget {
-  const _WordmarkRow();
+/// Scroll view whose content is at least as tall as the viewport, so a
+/// [Center] inside it truly centres on tall screens and scrolls on short
+/// ones (and above the keyboard). Built privately: AppPage's `alignment`
+/// cannot centre vertically inside its own scroll view.
+class _CenteredScroll extends StatelessWidget {
+  const _CenteredScroll({required this.child, required this.padding});
+
+  final Widget child;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        return SingleChildScrollView(
+          padding: padding,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: (box.maxHeight - padding.vertical).clamp(0, double.infinity),
+            ),
+            child: Center(child: child),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Pieces ──
+
+class _WordmarkRow extends StatelessWidget {
+  const _WordmarkRow({required this.markSize});
+
+  final double markSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final style = context.text.titleLarge;
     return Row(
       children: [
-        const AppLogoWidget(size: 28),
+        AppLogoWidget(size: markSize),
         const SizedBox(width: AppSpacing.md),
-        Text('ClashChat', style: context.text.titleMedium),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: 'Clash', style: style?.copyWith(color: c.textPrimary)),
+              TextSpan(text: 'Chat', style: style?.copyWith(color: c.accent)),
+            ],
+          ),
+          semanticsLabel: 'ClashChat',
+        ),
       ],
     );
   }
@@ -493,76 +603,77 @@ class _Heading extends StatelessWidget {
   }
 }
 
-/// Two-option segmented control: raised card with a soft brass pill
-/// indicator that slides under the selected label.
-class _SegmentedControl extends StatelessWidget {
-  const _SegmentedControl({
-    required this.index,
-    required this.labels,
-    required this.onChanged,
-    this.enabled = true,
-  });
+/// Four-segment password strength meter with a one-word caption.
+///
+/// Segments fill as these are met: length ≥ 8, an upper-case letter, a
+/// number, a symbol. 0–1 reads terracotta "Weak", 2–3 amber "Okay", 4 sage
+/// "Strong". Built privately: the kit has no segmented meter (AppProgressBar
+/// is a single continuous track).
+class _StrengthMeter extends StatelessWidget {
+  const _StrengthMeter({required this.password});
 
-  final int index;
-  final List<String> labels;
-  final ValueChanged<int> onChanged;
-  final bool enabled;
+  final String password;
+
+  static int scoreFor(String p) {
+    var s = 0;
+    if (p.length >= 8) s++;
+    if (RegExp(r'[A-Z]').hasMatch(p)) s++;
+    if (RegExp(r'[0-9]').hasMatch(p)) s++;
+    if (RegExp(r'[^A-Za-z0-9]').hasMatch(p)) s++;
+    return s;
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final count = labels.length;
+    final score = scoreFor(password);
+    final empty = password.isEmpty;
+    final (Color fill, String caption) = switch (score) {
+      0 || 1 => (c.negativeText, 'Weak'),
+      2 || 3 => (c.warningText, 'Okay'),
+      _ => (c.positiveText, 'Strong'),
+    };
+    const hint = '8+ characters with a capital, a number and a symbol';
 
-    return AppCard(
-      level: AppCardLevel.raised,
-      padding: const EdgeInsets.all(AppSpacing.xs),
-      radius: AppRadius.mdAll,
-      child: SizedBox(
-        height: 40,
-        child: Stack(
-          children: [
-            AnimatedAlign(
-              duration: AppDurations.fast,
-              curve: Curves.easeOutCubic,
-              alignment: Alignment(
-                count == 1 ? 0 : -1 + (2 * index / (count - 1)),
-                0,
-              ),
-              child: FractionallySizedBox(
-                widthFactor: 1 / count,
-                heightFactor: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: c.accentSoft,
-                    borderRadius: AppRadius.smAll,
-                  ),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                for (var i = 0; i < count; i++)
-                  Expanded(
-                    child: Pressable(
-                      onTap: enabled ? () => onChanged(i) : null,
-                      enabled: enabled,
-                      pressedScale: 0.97,
-                      semanticLabel: labels[i],
-                      child: Center(
-                        child: AnimatedDefaultTextStyle(
-                          duration: AppDurations.fast,
-                          style: context.text.labelLarge!.copyWith(
-                            color: i == index ? c.textPrimary : c.textSecondary,
-                          ),
-                          child: Text(labels[i]),
-                        ),
-                      ),
+    return Semantics(
+      label: empty ? 'Password strength' : 'Password strength: $caption',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: i < score ? fill : c.inset,
+                      borderRadius: AppRadius.pillAll,
                     ),
                   ),
+                ),
               ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm - 2),
+          AnimatedSwitcher(
+            duration: AppDurations.fast,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.centerLeft,
+              children: [...previous, ?current],
             ),
-          ],
-        ),
+            child: Text(
+              empty ? hint : caption,
+              key: ValueKey(empty ? hint : caption),
+              style: context.text.labelSmall?.copyWith(
+                color: empty ? c.textHint : fill,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -594,7 +705,7 @@ class _OrDivider extends StatelessWidget {
 ///
 /// Built privately because [AppButton] only accepts an [IconData] leading
 /// slot; this mirrors its secondary variant (surface, strong hairline,
-/// 52 px, radius 14, 0.98 press scale).
+/// 52 px, radius 14, 0.98 press scale) and adds the kit's hover lift.
 class _GoogleButton extends StatelessWidget {
   const _GoogleButton({required this.label, required this.onPressed});
 
@@ -611,45 +722,53 @@ class _GoogleButton extends StatelessWidget {
       onTap: onPressed,
       enabled: enabled,
       semanticLabel: label,
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        curve: Curves.easeOutCubic,
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-        decoration: BoxDecoration(
-          color: enabled ? c.surface : c.surfaceRaised,
-          borderRadius: AppRadius.mdAll,
-          border: Border.all(color: c.borderStrong),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Opacity(
-              opacity: enabled ? 1 : 0.5,
-              child: Image.asset(
-                'assets/google_icon.png',
-                width: 18,
-                height: 18,
-                filterQuality: FilterQuality.medium,
-              ),
+      child: HoverBuilder(
+        enabled: enabled,
+        builder: (context, hovered) => AnimatedContainer(
+          duration: AppDurations.fast,
+          curve: Curves.easeOutCubic,
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+          decoration: BoxDecoration(
+            color: enabled
+                ? (hovered ? c.surfaceRaised : c.surface)
+                : c.surfaceRaised,
+            borderRadius: AppRadius.mdAll,
+            border: Border.all(
+              color: hovered ? c.textHint : c.borderStrong,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.text.labelLarge?.copyWith(color: fg),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Opacity(
+                opacity: enabled ? 1 : 0.5,
+                child: Image.asset(
+                  'assets/google_icon.png',
+                  width: 18,
+                  height: 18,
+                  filterQuality: FilterQuality.medium,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.labelLarge?.copyWith(color: fg),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Desktop-only left column: wordmark, statement and the three modes.
+/// Desktop-only left column: the mark at 96, display wordmark, one
+/// statement and the three modes, revealed in sequence.
 class _BrandPanel extends StatelessWidget {
   const _BrandPanel();
 
@@ -658,70 +777,60 @@ class _BrandPanel extends StatelessWidget {
     final c = context.colors;
     final display = context.text.displayMedium;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const AppLogoWidget(size: 40),
-            const SizedBox(width: AppSpacing.lg),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Clash',
-                    style: display?.copyWith(color: c.textPrimary),
-                  ),
-                  TextSpan(
-                    text: 'Chat',
-                    style: display?.copyWith(color: c.accent),
-                  ),
-                ],
-              ),
-              semanticsLabel: 'ClashChat',
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: StaggeredColumn(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppLogoWidget(size: 96),
+          const SizedBox(height: AppSpacing.xxl),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Clash',
+                  style: display?.copyWith(color: c.textPrimary),
+                ),
+                TextSpan(
+                  text: 'Chat',
+                  style: display?.copyWith(color: c.accent),
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Text(
+            semanticsLabel: 'ClashChat',
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
             'Debate an opponent that pushes back, get scored on every '
             'argument, and watch your record climb.',
             style: context.text.bodyLarge?.copyWith(color: c.textSecondary),
           ),
-        ),
-        const SizedBox(height: AppSpacing.huge),
-        StaggeredColumn(
-          startIndex: 2,
-          children: [
-            _ModeRow(
-              icon: AppIcons.casualDuo,
-              color: c.positiveText,
-              background: c.positiveBg,
-              title: 'Casual',
-              body: 'Pick a topic and a side. No stakes, just practice.',
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _ModeRow(
-              icon: AppIcons.rankedDuo,
-              color: c.rankText,
-              background: c.rankBg,
-              title: 'Ranked',
-              body: 'Timed rounds that count toward your rank.',
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            _ModeRow(
-              icon: AppIcons.learningDuo,
-              color: c.infoText,
-              background: c.infoBg,
-              title: 'Learning',
-              body: 'Coaching tips after every message you send.',
-            ),
-          ],
-        ),
-      ],
+          const SizedBox(height: AppSpacing.huge),
+          _ModeRow(
+            icon: AppIcons.casualDuo,
+            color: c.positiveText,
+            background: c.positiveBg,
+            title: 'Casual',
+            body: 'Pick a topic and a side. No stakes, just practice.',
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          _ModeRow(
+            icon: AppIcons.rankedDuo,
+            color: c.rankText,
+            background: c.rankBg,
+            title: 'Ranked',
+            body: 'Timed rounds that count toward your rank.',
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          _ModeRow(
+            icon: AppIcons.learningDuo,
+            color: c.infoText,
+            background: c.infoBg,
+            title: 'Learning',
+            body: 'Coaching tips after every message you send.',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -746,7 +855,7 @@ class _ModeRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppIconTile(icon: icon, color: color, background: background),
+        AppIconTile(icon: icon, color: color, background: background, size: 44),
         const SizedBox(width: AppSpacing.lg),
         Expanded(
           child: Column(

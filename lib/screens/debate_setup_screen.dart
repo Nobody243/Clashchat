@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/debate_mode.dart';
 import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
@@ -38,12 +36,10 @@ class _DebateSetupScreenState extends State<DebateSetupScreen> {
 
   void _selectDifficulty(String name) {
     if (_difficulty == name) return;
-    HapticFeedback.selectionClick();
     setState(() => _difficulty = name);
   }
 
   void _toggleTimer(bool on) {
-    HapticFeedback.selectionClick();
     setState(() {
       _timerEnabled = on;
       if (on) _timerMinutes = 10; // default
@@ -65,117 +61,63 @@ class _DebateSetupScreenState extends State<DebateSetupScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: const SetupBackButton(),
-        automaticallyImplyLeading: false,
-      ),
-      body: SafeArea(
-        child: isDesktop ? _buildDesktop() : _buildColumn(),
-      ),
-    );
+  String? get _timerSummary {
+    if (_isLearning) return null;
+    if (!_timerEnabled) return 'Off';
+    return '${_timerMinutes ?? 10} min';
   }
 
-  Widget _buildDesktop() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
-        child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return SetupScaffold(
+      step: 3,
+      title: 'Set the terms',
+      subtitle: _isLearning
+          ? 'Choose how hard your coach pushes back.'
+          : 'Choose how hard the opponent pushes and whether the clock runs.',
+      summary: SetupSummary(
+        topic: widget.topic,
+        stance: widget.stance,
+        difficulty: _difficulty,
+        timer: _timerSummary,
+      ),
+      cta: AppButton.primary(
+        label: _isLearning ? 'Start learning session' : 'Start debate',
+        icon: _isLearning ? AppIcons.learning : AppIcons.play,
+        onPressed: _startDebate,
+      ),
+      children: [
+        _SummaryCard(topic: widget.topic, stance: widget.stance),
+        Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Flexible(
-              flex: 5,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: _buildColumn(),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xxxl),
-            Flexible(
-              flex: 3,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: const _RulesPanel(),
-              ),
+            const AppSectionHeader(title: 'Opponent strength'),
+            AppListGroup(
+              children: [
+                for (final d in _difficulties)
+                  SetupDifficultyRow(
+                    name: d.name,
+                    description: d.desc,
+                    selected: _difficulty == d.name,
+                    onTap: () => _selectDifficulty(d.name),
+                  ),
+              ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildColumn() {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.xxl,
-            ),
-            child: StaggeredColumn(
-              children: [
-                const AppOverline('Step 3 of 3'),
-                const SizedBox(height: AppSpacing.sm),
-                Text('Set the terms', style: context.text.headlineMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  _isLearning
-                      ? 'Choose how hard your coach pushes back.'
-                      : 'Choose how hard the opponent pushes and whether the clock runs.',
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.colors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                _SummaryCard(topic: widget.topic, stance: widget.stance),
-                const SizedBox(height: AppSpacing.xxl),
-                const AppSectionHeader(title: 'Opponent strength'),
-                AppListGroup(
-                  children: [
-                    for (final d in _difficulties)
-                      _DifficultyRow(
-                        name: d.name,
-                        description: d.desc,
-                        selected: _difficulty == d.name,
-                        onTap: () => _selectDifficulty(d.name),
-                      ),
-                  ],
-                ),
-                if (!_isLearning) ...[
-                  const SizedBox(height: AppSpacing.xxl),
-                  const AppSectionHeader(title: 'Timer'),
-                  _TimerCard(
-                    enabled: _timerEnabled,
-                    minutes: _timerMinutes ?? 10,
-                    onToggle: _toggleTimer,
-                    onChanged: (m) => setState(() => _timerMinutes = m),
-                  ),
-                ],
-              ],
-            ),
+        if (!_isLearning)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const AppSectionHeader(title: 'Timer'),
+              _TimerCard(
+                enabled: _timerEnabled,
+                minutes: _timerMinutes ?? 10,
+                onToggle: _toggleTimer,
+                onChanged: (m) => setState(() => _timerMinutes = m),
+              ),
+            ],
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.gutter,
-            AppSpacing.md,
-            AppSpacing.gutter,
-            AppSpacing.gutter,
-          ),
-          child: AppButton.primary(
-            label: _isLearning ? 'Start learning session' : 'Start debate',
-            icon: _isLearning ? AppIcons.learning : AppIcons.play,
-            onPressed: _startDebate,
-          ),
-        ),
       ],
     );
   }
@@ -197,11 +139,13 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(AppIcons.topic, size: 20, color: c.textSecondary),
+              AppIconTile(
+                icon: AppIcons.topic,
+                size: 36,
+                iconSize: 18,
+                color: c.textSecondary,
+                background: c.surface,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -230,117 +174,15 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-/// One selectable difficulty row inside an [AppListGroup].
-class _DifficultyRow extends StatelessWidget {
-  final String name;
-  final String description;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DifficultyRow({
-    required this.name,
-    required this.description,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final (Color fg, Color bg) = switch (name.trim().toLowerCase()) {
-      'easy' => (c.positiveText, c.positiveBg),
-      'hard' => (c.negativeText, c.negativeBg),
-      _ => (c.warningText, c.warningBg),
-    };
-    final title = name.isEmpty
-        ? name
-        : name[0].toUpperCase() + name.substring(1).toLowerCase();
-
-    return Semantics(
-      selected: selected,
-      child: Pressable(
-        onTap: onTap,
-        pressedScale: 0.99,
-        semanticLabel: title,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              AppIconTile(
-                icon: AppIcons.forDifficulty(name, duotone: true),
-                color: fg,
-                background: bg,
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: context.text.titleSmall),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      description,
-                      style: context.text.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _RadioMark(selected: selected),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Radio-like trailing indicator: filled check when selected, outline otherwise.
-class _RadioMark extends StatelessWidget {
-  final bool selected;
-  const _RadioMark({required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeOutCubic,
-        child: selected
-            ? Icon(
-                AppIcons.checkCircle,
-                key: const ValueKey('on'),
-                size: 22,
-                color: c.accent,
-              )
-            : Center(
-                key: const ValueKey('off'),
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: c.borderStrong, width: 1.5),
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-/// Switch row plus, when on, a slider with the minutes in the mono face.
+/// Switch row plus, when on, the minutes in the mono face, a 1–60 slider
+/// and three quick picks.
 class _TimerCard extends StatelessWidget {
   final bool enabled;
   final int minutes;
   final ValueChanged<bool> onToggle;
   final ValueChanged<int> onChanged;
+
+  static const List<int> _quickPicks = [5, 10, 15];
 
   const _TimerCard({
     required this.enabled,
@@ -355,7 +197,7 @@ class _TimerCard extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
+        duration: AppDurations.normal,
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
         child: Column(
@@ -395,106 +237,52 @@ class _TimerCard extends StatelessWidget {
               Divider(height: 1, thickness: 1, color: c.border),
               const SizedBox(height: AppSpacing.lg),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text('$minutes', style: context.mono(size: 28)),
+                  Text('$minutes', style: context.mono(size: 32)),
                   const SizedBox(width: AppSpacing.xs),
                   Text(
-                    minutes == 1 ? 'minute' : 'minutes',
-                    style: context.text.bodySmall,
+                    'min',
+                    style: context.text.bodyMedium?.copyWith(
+                      color: c.textSecondary,
+                    ),
                   ),
+                  const Spacer(),
+                  for (final m in _quickPicks) ...[
+                    Pressable(
+                      onTap: () => onChanged(m),
+                      pressedScale: 0.95,
+                      semanticLabel: '$m minutes',
+                      child: AppPill(
+                        label: '$m',
+                        mono: true,
+                        tone: minutes == m
+                            ? AppPillTone.accent
+                            : AppPillTone.neutral,
+                      ),
+                    ),
+                    if (m != _quickPicks.last)
+                      const SizedBox(width: AppSpacing.sm),
+                  ],
                 ],
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Slider(
-                value: minutes.toDouble(),
-                min: 1,
-                max: 60,
-                divisions: 59,
-                label: '$minutes min',
-                onChanged: (v) => onChanged(v.round()),
+              const SizedBox(height: AppSpacing.sm),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                ),
+                child: Slider(
+                  value: minutes.toDouble(),
+                  min: 1,
+                  max: 60,
+                  divisions: 59,
+                  label: '$minutes min',
+                  onChanged: (v) => onChanged(v.round()),
+                ),
               ),
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Desktop side panel: ground rules.
-class _RulesPanel extends StatelessWidget {
-  const _RulesPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
-      child: AppReveal(
-        index: 3,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AppOverline('Ground rules'),
-            const SizedBox(height: AppSpacing.md),
-            const AppListGroup(
-              children: [
-                _RuleRow(
-                  icon: AppIcons.shield,
-                  title: 'Stay civil',
-                  description: 'Argue the facts, not the person.',
-                ),
-                _RuleRow(
-                  icon: AppIcons.timer,
-                  title: 'Use your time',
-                  description: 'Think before you type; the clock keeps going.',
-                ),
-                _RuleRow(
-                  icon: AppIcons.ai,
-                  title: 'The opponent adapts',
-                  description: 'ClashBot matches the strength you pick and challenges your stance.',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RuleRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-
-  const _RuleRow({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconTile(icon: icon, size: 40, iconSize: 20),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.text.titleSmall),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(description, style: context.text.bodySmall),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

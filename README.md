@@ -189,7 +189,7 @@ lib/
 `DESIGN.md` is the source of truth. Code lives in two places:
 
 - `lib/core` — tokens and theme. `app_colors_ext.dart` holds the semantic palette for both themes (read via `context.colors`), `app_typography.dart` the Outfit type scale (`context.text`) plus `context.mono()` for JetBrains Mono numerics, `app_spacing.dart` the spacing/radius/duration scales, and `app_theme.dart` builds `ThemeData` from them. The theme choice is persisted by `ThemeProvider`.
-- `lib/ui` — the component kit: `AppButton`, `AppIconButton`, `AppCard`/`AppListGroup`/`AppIconTile`, `AppPill`, `AppTextField`, `AppSkeleton`, `AppEmptyState`, `AppSectionHeader`, `ScoreRing`, `Pressable`, `StaggeredColumn`, and `AppIcons` (Lucide). Screens compose these and never hardcode colors, font sizes, `Icons.*`, or emoji.
+- `lib/ui` — the atmosphere layer (`AppBackdrop` stage lights + grain, `GlassCard`/`GlassBar`, `AnimatedNumber`, `ParticleBurst`, `Bento`, `AppSegmented`, `AppPage` with `AppBreakpoints`) and the component kit: `AppButton`, `AppIconButton`, `AppCard`/`AppListGroup`/`AppIconTile`, `AppPill`, `AppTextField`, `AppSkeleton`, `AppEmptyState`, `AppSectionHeader`, `ScoreRing`, `Pressable`, `StaggeredColumn`, and `AppIcons` (Lucide). Screens compose these and never hardcode colors, font sizes, `Icons.*`, or emoji.
 
 ### Key Components
 

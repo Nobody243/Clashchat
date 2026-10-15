@@ -4,7 +4,7 @@ import '../ui/ui.dart';
 
 /// Section header plus a hairline-divided list of feedback points.
 ///
-/// [color] tints the per-row icon (pass `context.colors.positiveText` /
+/// [color] tints the per-row icon tile (pass `context.colors.positiveText` /
 /// `warningText`). [backgroundColor] is accepted for source compatibility and
 /// ignored; rows always sit on the surface. When [points] is empty the section
 /// renders a compact [AppEmptyState] if [emptyTitle] is given, otherwise
@@ -39,7 +39,12 @@ class FeedbackSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        AppSectionHeader(title: title),
+        AppSectionHeader(
+          title: title,
+          subtitle: points.isEmpty
+              ? null
+              : '${points.length} ${points.length == 1 ? 'point' : 'points'}',
+        ),
         if (points.isEmpty)
           AppCard(
             padding: EdgeInsets.zero,
@@ -62,12 +67,21 @@ class FeedbackSection extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Icon(icon, size: 18, color: color),
+                      AppIconTile(
+                        icon: icon,
+                        size: 28,
+                        iconSize: 16,
+                        color: color,
+                        background: color.withValues(alpha: 0.12),
+                        radius: AppRadius.smAll,
                       ),
                       const SizedBox(width: AppSpacing.md),
-                      Expanded(child: Text(p, style: text.bodyMedium)),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: Text(p, style: text.bodyMedium),
+                        ),
+                      ),
                     ],
                   ),
                 ),

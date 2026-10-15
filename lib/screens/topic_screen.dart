@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../core/responsive_layout.dart';
 import '../models/debate_mode.dart';
 import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
@@ -33,6 +31,13 @@ class _TopicScreenState extends State<TopicScreen> {
   bool get _canContinue =>
       _selectedCategory != null || _customTopicCtrl.text.trim().isNotEmpty;
 
+  /// What will be carried forward if the user continues now.
+  String? get _topicPreview {
+    final custom = _customTopicCtrl.text.trim();
+    if (custom.isNotEmpty) return custom;
+    return _selectedCategory;
+  }
+
   @override
   void dispose() {
     _customTopicCtrl.dispose();
@@ -40,7 +45,6 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 
   void _toggleCategory(String label) {
-    HapticFeedback.selectionClick();
     setState(() {
       final wasSelected = _selectedCategory == label;
       _selectedCategory = wasSelected ? null : label;
@@ -82,103 +86,50 @@ class _TopicScreenState extends State<TopicScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop =
-        MediaQuery.sizeOf(context).width > ResponsiveLayout.desktopBreakpoint;
+    final columns = context.isCompact
+        ? 2
+        : context.isMedium
+            ? 3
+            : 4;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const SetupBackButton(),
-        automaticallyImplyLeading: false,
+    return SetupScaffold(
+      step: 1,
+      title: 'Pick a topic',
+      subtitle: 'Choose a category or write the motion you want to argue.',
+      summary: SetupSummary(topic: _topicPreview),
+      cta: AppButton.primary(
+        label: 'Continue',
+        trailingIcon: AppIcons.forward,
+        onPressed: _canContinue ? _nextStep : null,
       ),
-      body: SafeArea(
-        child: isDesktop ? _buildDesktop() : _buildColumn(columns: 2),
-      ),
-    );
-  }
-
-  Widget _buildDesktop() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 960),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildGrid(columns),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
-              flex: 5,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: _buildColumn(columns: 4),
-              ),
+            const AppSectionHeader(title: 'Or write your own'),
+            AppTextField(
+              controller: _customTopicCtrl,
+              hint: 'e.g. Remote work makes teams more productive',
+              prefixIcon: AppIcons.topic,
+              minLines: 1,
+              maxLines: 2,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              onChanged: (_) => setState(() => _selectedCategory = null),
+              onSubmitted: (_) {
+                if (_canContinue) _nextStep();
+              },
             ),
-            const SizedBox(width: AppSpacing.xxxl),
-            Flexible(
-              flex: 3,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: const _HowItWorksPanel(),
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.xs),
+              child: Text(
+                'Short, debatable, specific',
+                style: context.text.labelSmall,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  /// The single setup column: header, grid, custom field, bottom CTA.
-  Widget _buildColumn({required int columns}) {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.gutter,
-              AppSpacing.sm,
-              AppSpacing.gutter,
-              AppSpacing.xxl,
-            ),
-            child: StaggeredColumn(
-              children: [
-                const AppOverline('Step 1 of 3'),
-                const SizedBox(height: AppSpacing.sm),
-                Text('Pick a topic', style: context.text.headlineMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Choose a category or write the motion you want to argue.',
-                  style: context.text.bodyMedium?.copyWith(
-                    color: context.colors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                _buildGrid(columns),
-                const SizedBox(height: AppSpacing.xxl),
-                const AppSectionHeader(title: 'Or write your own'),
-                AppTextField(
-                  controller: _customTopicCtrl,
-                  hint: 'e.g. Remote work makes teams more productive',
-                  prefixIcon: AppIcons.topic,
-                  textCapitalization: TextCapitalization.sentences,
-                  textInputAction: TextInputAction.done,
-                  onChanged: (_) => setState(() => _selectedCategory = null),
-                  onSubmitted: (_) {
-                    if (_canContinue) _nextStep();
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.gutter,
-            AppSpacing.md,
-            AppSpacing.gutter,
-            AppSpacing.gutter,
-          ),
-          child: AppButton.primary(
-            label: 'Continue',
-            trailingIcon: AppIcons.forward,
-            onPressed: _canContinue ? _nextStep : null,
-          ),
         ),
       ],
     );
@@ -193,7 +144,7 @@ class _TopicScreenState extends State<TopicScreen> {
         crossAxisCount: columns,
         mainAxisSpacing: AppSpacing.md,
         crossAxisSpacing: AppSpacing.md,
-        mainAxisExtent: 112,
+        mainAxisExtent: 116,
       ),
       itemCount: _categories.length,
       itemBuilder: (context, i) {
@@ -209,6 +160,8 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 }
 
+/// One category: icon tile top-left, label bottom-left. Selected cards get
+/// the accent hairline from [AppCard] and tint their tile.
 class _CategoryCard extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -229,15 +182,15 @@ class _CategoryCard extends StatelessWidget {
       selected: selected,
       child: AppCard(
         onTap: onTap,
+        selected: selected,
         padding: const EdgeInsets.all(AppSpacing.lg),
-        borderColor: selected ? c.accent : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppIconTile(
               icon: icon,
-              size: 40,
-              iconSize: 20,
+              size: 44,
+              iconSize: 22,
               color: selected ? c.accent : c.textSecondary,
               background: selected ? c.accentSoft : c.surfaceRaised,
             ),
@@ -253,83 +206,6 @@ class _CategoryCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Desktop side panel: the three steps of the setup flow.
-class _HowItWorksPanel extends StatelessWidget {
-  const _HowItWorksPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, AppSpacing.gutter, 0),
-      child: AppReveal(
-        index: 3,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const AppOverline('How it works'),
-            const SizedBox(height: AppSpacing.md),
-            const AppListGroup(
-              children: [
-                _StepRow(
-                  icon: AppIcons.topic,
-                  title: 'Pick a topic',
-                  description: 'Choose a category or write your own motion.',
-                ),
-                _StepRow(
-                  icon: AppIcons.stanceFor,
-                  title: 'Choose your side',
-                  description: 'Argue for or against the motion.',
-                ),
-                _StepRow(
-                  icon: AppIcons.ai,
-                  title: 'Debate ClashBot',
-                  description: 'Make your case, then see how you scored.',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StepRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String description;
-
-  const _StepRow({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppIconTile(icon: icon, size: 40, iconSize: 20),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: context.text.titleSmall),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(description, style: context.text.bodySmall),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
