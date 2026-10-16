@@ -41,6 +41,30 @@ class AiService {
     return headers;
   }
 
+  /// Why the most recent request chain failed, in words a user can act on.
+  /// Set by [_postWithFallback]; read by the callers' fallback messages.
+  static String _lastFailure = 'Connection error. Please try again.';
+
+  static String _describeStatus(int code, String body) {
+    switch (code) {
+      case 401:
+      case 403:
+        return 'This version of ClashChat is out of date. Please update the app.';
+      case 429:
+        return "You're sending messages too quickly. Wait a moment and try again.";
+      case 413:
+        return 'That message is too long. Try a shorter one.';
+      case 400:
+        return 'The request was rejected. Please update the app.';
+      case 502:
+      case 503:
+      case 504:
+        return 'ClashBot is busy right now. Try again in a few seconds.';
+      default:
+        return 'Server error ($code). Please try again.';
+    }
+  }
+
   static Future<http.Response?> _postWithFallback(
     List<Map<String, String>> messages, {
     int maxTokens = 500,
@@ -75,11 +99,22 @@ class AiService {
           return response;
         } else {
           debugPrint('GROQ ERROR ($model): ${response.statusCode} - ${response.body}');
+          _lastFailure = _describeStatus(response.statusCode, response.body);
+          // Auth / quota failures are the same for every model: stop early.
+          if (response.statusCode == 401 ||
+              response.statusCode == 403 ||
+              response.statusCode == 429 ||
+              response.statusCode == 413) {
+            return null;
+          }
         }
       } on TimeoutException catch (e) {
         debugPrint('GROQ TIMEOUT ($model): $e');
+        _lastFailure = 'ClashBot took too long to answer. Please try again.';
       } catch (e) {
         debugPrint('GROQ REQUEST ERROR ($model): $e');
+        _lastFailure =
+            'No connection. Check your internet (VPNs and ad blockers can block the debate server) and try again.';
       }
     }
     return null;
@@ -289,7 +324,7 @@ CORE DEBATE RULES:
         );
       } else {
         return ChatMessage(
-          text: 'Connection error. Please try again.',
+          text: _lastFailure,
           isUser: false,
           timestamp: DateTime.now(),
         );
@@ -297,7 +332,7 @@ CORE DEBATE RULES:
     } catch (e) {
       debugPrint('AI Service Error: $e');
       return ChatMessage(
-        text: 'Connection error. Please try again.',
+        text: 'Something went wrong on our side. Please try again.',
         isUser: false,
         timestamp: DateTime.now(),
       );
