@@ -8,6 +8,7 @@ import '../models/debate_record.dart';
 import '../models/motions.dart';
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
+import '../services/avatar_preferences.dart';
 import '../services/usage_quota_service.dart';
 import '../ui/ui.dart';
 import '../widgets/user_avatar.dart';
@@ -195,6 +196,7 @@ class _HomeBodyState extends State<_HomeBody> {
               AuthService.currentUser?.displayName ??
               'Debater';
           final avatarSeed = data?['avatarSeed'] as String? ?? 'Felix';
+          AvatarPreferences.saveAvatar(avatarSeed);
           final points = (data?['rankPoints'] as num?)?.toInt() ?? 0;
           final rank = RankModel.getRankFromPoints(points);
           final rankColor = Color(RankModel.rankData[rank]!['color'] as int);
@@ -374,7 +376,7 @@ class _PhoneHomeState extends State<_PhoneHome> {
   String _hint(bool locked) {
     if (locked) return 'Daily limit reached. Resets tomorrow.';
     if (_side == null) {
-      return "Pick a side to debate today's topic, or tap Start to choose your own.";
+      return "Pick a side to debate today's topic.";
     }
     final other = _side == 'For' ? 'against' : 'for';
     return 'You argue ${_side!.toLowerCase()}. ClashBot argues $other.';
@@ -418,11 +420,9 @@ class _PhoneHomeState extends State<_PhoneHome> {
         AppSpacing.vXxxl,
 
         // 2 · The topic and which side you argue.
-        AppSectionLabel(
+        const AppSectionLabel(
           "2 · Today's topic",
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          actionLabel: 'Change topic',
-          onAction: w.onWriteOwn,
+          padding: EdgeInsets.only(bottom: AppSpacing.sm),
         ),
         Text(
           Motions.forDay(),
@@ -482,6 +482,12 @@ class _PhoneHomeState extends State<_PhoneHome> {
           _hint(locked),
           textAlign: TextAlign.center,
           style: context.text.labelSmall?.copyWith(color: c.textHint),
+        ),
+        AppSpacing.vLg,
+        AppButton.secondary(
+          label: 'Debate ClashBot on your own topic',
+          icon: AppIcons.ai,
+          onPressed: locked ? null : w.onWriteOwn,
         ),
         if (w.recent.isNotEmpty) ...[
           AppSectionLabel(

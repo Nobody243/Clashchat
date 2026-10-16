@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
+import '../services/avatar_preferences.dart';
 import '../ui/ui.dart';
 import '../widgets/user_avatar.dart';
 import 'avatar_picker_screen.dart';
@@ -92,6 +93,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'photoUrl': FieldValue.delete(),
         });
       }
+      // Keep the local copy (used by the chat screen) in step.
+      await AvatarPreferences.saveAvatar(result);
     }
   }
 

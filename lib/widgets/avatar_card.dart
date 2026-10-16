@@ -7,6 +7,10 @@ import '../ui/ui.dart';
 /// Selectable avatar tile for the picker grid. The selected card draws its
 /// accent hairline, a 2 px accent ring around the avatar and a small check.
 class AvatarCard extends StatelessWidget {
+  /// Test hook: replaces the network SVG so widget tests need no HTTP.
+  @visibleForTesting
+  static Widget Function(String url, double size)? imageOverride;
+
   final AvatarOption avatar;
   final bool isSelected;
   final VoidCallback onTap;
@@ -51,14 +55,27 @@ class AvatarCard extends StatelessWidget {
                           ),
                         ),
                         child: ClipOval(
-                          child: SvgPicture.network(
-                            avatar.url,
-                            width: inner,
-                            height: inner,
-                            fit: BoxFit.cover,
-                            placeholderBuilder: (_) =>
-                                AppSkeleton.circle(size: inner),
-                          ),
+                          child:
+                              imageOverride?.call(avatar.url, inner) ??
+                              SvgPicture.network(
+                                avatar.url,
+                                width: inner,
+                                height: inner,
+                                fit: BoxFit.cover,
+                                placeholderBuilder: (_) =>
+                                    AppSkeleton.circle(size: inner),
+                                errorBuilder: (_, _, _) => Container(
+                                  width: inner,
+                                  height: inner,
+                                  color: c.surfaceRaised,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    AppIcons.user,
+                                    size: inner * 0.42,
+                                    color: c.textHint,
+                                  ),
+                                ),
+                              ),
                         ),
                       );
                     },

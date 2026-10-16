@@ -135,7 +135,10 @@ class _PickerBar extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: SafeArea(
           top: false,
+          // heightFactor keeps the bar at its content height; a bare Center
+          // would expand to fill the body and blur the whole grid.
           child: Center(
+            heightFactor: 1.0,
             child: ConstrainedBox(
               constraints:
                   BoxConstraints(maxWidth: AppPageWidth.content.maxWidth),
@@ -148,13 +151,23 @@ class _PickerBar extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: AppButton.secondary(
-                        label: 'Shuffle',
+                    if (context.isCompact)
+                      AppIconButton(
                         icon: AppIcons.shuffle,
+                        tooltip: 'Shuffle',
+                        filled: true,
+                        size: 52,
+                        iconSize: 22,
                         onPressed: onShuffle,
+                      )
+                    else
+                      Expanded(
+                        child: AppButton.secondary(
+                          label: 'Shuffle',
+                          icon: AppIcons.shuffle,
+                          onPressed: onShuffle,
+                        ),
                       ),
-                    ),
                     AppSpacing.hMd,
                     Expanded(
                       flex: 2,

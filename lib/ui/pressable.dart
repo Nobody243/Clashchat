@@ -105,12 +105,17 @@ class _PressableState extends State<Pressable> {
       button: interactive,
       enabled: widget.enabled,
       label: widget.semanticLabel,
+      // One semantics node carrying both the label and the tap action, so
+      // screen readers (and Flutter web's semantics overlay) activate it.
+      onTap: interactive && widget.onTap != null ? _tap : null,
+      onLongPress: interactive ? widget.onLongPress : null,
       child: MouseRegion(
         cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
         onEnter: interactive ? (_) => _setHovered(true) : null,
         onExit: interactive ? (_) => _setHovered(false) : null,
         child: GestureDetector(
           behavior: widget.behavior,
+          excludeFromSemantics: true,
           onTapDown: interactive ? (_) => _setPressed(true) : null,
           onTapUp: interactive ? (_) => _setPressed(false) : null,
           onTapCancel: interactive ? () => _setPressed(false) : null,

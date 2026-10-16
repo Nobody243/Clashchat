@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../models/avatar_option.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../ui/ui.dart';
@@ -27,17 +29,8 @@ class UserAvatar extends StatelessWidget {
     this.semanticLabel,
   });
 
-  String get _effectiveSeed {
-    final trimmed = seed.trim();
-    if (trimmed.isEmpty) return 'Debater';
-    return Uri.encodeComponent(trimmed);
-  }
-
   String get url =>
-      'https://api.dicebear.com/9.x/thumbs/svg?seed=$_effectiveSeed'
-      '&backgroundColor=2e2715,15302a,182637,3a1e1a,232025'
-      '&shapeColor=d4a84b,6fc29b,86b0e3,ed8b72,a9b0ba'
-      '&radius=50';
+      avatarUrlFor(seed);
 
   @override
   Widget build(BuildContext context) {
