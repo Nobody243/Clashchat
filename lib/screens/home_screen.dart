@@ -373,7 +373,9 @@ class _PhoneHomeState extends State<_PhoneHome> {
 
   String _hint(bool locked) {
     if (locked) return 'Daily limit reached. Resets tomorrow.';
-    if (_side == null) return 'Pick For or Against to begin.';
+    if (_side == null) {
+      return "Pick a side to debate today's topic, or tap Start to choose your own.";
+    }
     final other = _side == 'For' ? 'against' : 'for';
     return 'You argue ${_side!.toLowerCase()}. ClashBot argues $other.';
   }
@@ -383,7 +385,7 @@ class _PhoneHomeState extends State<_PhoneHome> {
     final c = context.colors;
     final w = widget;
     final locked = w.quota.isLocked;
-    final canStart = !locked && _side != null;
+    final canStart = !locked;
 
     return StaggeredColumn(
       children: [
@@ -467,7 +469,13 @@ class _PhoneHomeState extends State<_PhoneHome> {
         AppButton.primary(
           label: _cta(w.mode),
           icon: AppIcons.play,
-          onPressed: canStart ? () => w.onPickSide(_side!) : null,
+          // Always live: with a side picked it starts today's topic at once;
+          // otherwise it opens the guided flow (topic, side, setup).
+          onPressed: !canStart
+              ? null
+              : _side != null
+                  ? () => w.onPickSide(_side!)
+                  : w.onWriteOwn,
         ),
         AppSpacing.vSm,
         Text(
