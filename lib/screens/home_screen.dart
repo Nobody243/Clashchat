@@ -12,13 +12,11 @@ import '../services/avatar_preferences.dart';
 import '../services/usage_quota_service.dart';
 import '../ui/ui.dart';
 import '../widgets/user_avatar.dart';
-import 'chat_screen.dart';
-import 'debate_setup_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
-import 'ranked_setup_screen.dart';
 import 'results_screen.dart';
 import 'settings_screen.dart';
+import 'stance_screen.dart';
 import 'topic_screen.dart';
 
 /// Width (of the content column) under which the dashboard becomes a single
@@ -77,9 +75,6 @@ class _HomeBody extends StatefulWidget {
 }
 
 class _HomeBodyState extends State<_HomeBody> {
-  /// Phone only: the mode the hero's For / Against buttons start in.
-  DebateMode _mode = DebateMode.casual;
-
   static String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
@@ -87,35 +82,45 @@ class _HomeBodyState extends State<_HomeBody> {
     return 'Good evening';
   }
 
+  /// Consecutive days (ending today or yesterday) with at least one debate.
+  static int _streak(List<DebateRecord> records) {
+    if (records.isEmpty) return 0;
+    final days = records
+        .map((r) => DateTime(r.date.year, r.date.month, r.date.day))
+        .toSet();
+    final now = DateTime.now();
+    var day = DateTime(now.year, now.month, now.day);
+    if (!days.contains(day)) {
+      day = day.subtract(const Duration(days: 1));
+      if (!days.contains(day)) return 0;
+    }
+    var n = 0;
+    while (days.contains(day)) {
+      n++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return n;
+  }
+
+  /// Today's match: pick a side, then straight into a preset casual debate.
+  void _startToday() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StanceScreen(
+          topic: Motions.forDay(),
+          mode: DebateMode.casual,
+          quickMatch: true,
+        ),
+      ),
+    );
+  }
+
   void _open(DebateMode mode) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => TopicScreen(mode: mode)),
     );
-  }
-
-  /// Phone hero: start today's motion on [stance] in the selected mode.
-  /// Mirrors StanceScreen's next step for each mode (the quota itself is
-  /// consumed by ChatScreen when the first message is sent).
-  void _startSide(String stance) {
-    final topic = Motions.forDay();
-    final mode = _mode;
-    final Widget next = switch (mode) {
-      DebateMode.learning => ChatScreen(
-        topic: topic,
-        stance: stance,
-        difficulty: 'Adaptable', // Default for Learning Mode
-        timerMinutes: null, // No timer for learning
-        mode: mode,
-      ),
-      DebateMode.ranked => RankedSetupScreen(topic: topic, stance: stance),
-      DebateMode.casual => DebateSetupScreen(
-        topic: topic,
-        stance: stance,
-        mode: mode,
-      ),
-    };
-    Navigator.push(context, MaterialPageRoute(builder: (_) => next));
   }
 
   void _openRecord(DebateRecord record) {
@@ -210,7 +215,7 @@ class _HomeBodyState extends State<_HomeBody> {
                       .doc(uid)
                       .collection('history')
                       .orderBy('date', descending: true)
-                      .limit(3)
+                      .limit(30)
                       .snapshots(),
             builder: (context, recentSnap) {
               final recent = (recentSnap.data?.docs ?? const [])
@@ -226,10 +231,9 @@ class _HomeBodyState extends State<_HomeBody> {
                   points: points,
                   quota: quota,
                   recent: recent,
-                  mode: _mode,
-                  onModeChanged: (m) => setState(() => _mode = m),
-                  onPickSide: _startSide,
-                  onWriteOwn: () => _open(_mode),
+                  streak: _streak(recent),
+                  onStartToday: _startToday,
+                  onOpenMode: _open,
                   onOpenRecord: _openRecord,
                   onTapAvatar: () => widget.onNavigate(2),
                   onSeeAll: () => widget.onNavigate(1),
@@ -290,7 +294,7 @@ class _HomeBodyState extends State<_HomeBody> {
 /// Phones: a quiet top line, today's motion as the hero with a split
 /// For / Against choice, text tabs for the mode, and recent debates as plain
 /// rows. No cards, no icon tiles, one action.
-class _PhoneHome extends StatefulWidget {
+class _PhoneHome extends StatelessWidget {
   final String displayName;
   final String avatarSeed;
   final DebateRank rank;
@@ -298,10 +302,9 @@ class _PhoneHome extends StatefulWidget {
   final int points;
   final UsageQuotaState quota;
   final List<DebateRecord> recent;
-  final DebateMode mode;
-  final ValueChanged<DebateMode> onModeChanged;
-  final ValueChanged<String> onPickSide;
-  final VoidCallback onWriteOwn;
+  final int streak;
+  final VoidCallback onStartToday;
+  final ValueChanged<DebateMode> onOpenMode;
   final ValueChanged<DebateRecord> onOpenRecord;
   final VoidCallback onTapAvatar;
   final VoidCallback onSeeAll;
@@ -314,17 +317,13 @@ class _PhoneHome extends StatefulWidget {
     required this.points,
     required this.quota,
     required this.recent,
-    required this.mode,
-    required this.onModeChanged,
-    required this.onPickSide,
-    required this.onWriteOwn,
+    required this.streak,
+    required this.onStartToday,
+    required this.onOpenMode,
     required this.onOpenRecord,
     required this.onTapAvatar,
     required this.onSeeAll,
   });
-
-  @override
-  State<_PhoneHome> createState() => _PhoneHomeState();
 
   static String _modeName(DebateMode mode) => switch (mode) {
     DebateMode.casual => 'Casual',
@@ -351,162 +350,111 @@ class _PhoneHome extends StatefulWidget {
     if (days < 7) return DateFormat.E().format(date);
     return DateFormat('MMM d').format(date);
   }
-}
-
-class _PhoneHomeState extends State<_PhoneHome> {
-  /// 'For' | 'Against' | null. Choosing a side does not start anything;
-  /// the Start button does, so a new user always sees mode -> side -> start.
-  String? _side;
-
-  static String _describe(DebateMode mode) => switch (mode) {
-    DebateMode.casual =>
-      "Practice. You set the clock and the opponent's strength. Nothing at stake.",
-    DebateMode.ranked =>
-      'Compete. Timed match against an opponent set by your rank. Points on the line.',
-    DebateMode.learning =>
-      'Learn. No clock, and a coaching tip after every message you send.',
-  };
-
-  static String _cta(DebateMode mode) => switch (mode) {
-    DebateMode.casual => 'Start casual debate',
-    DebateMode.ranked => 'Start ranked debate',
-    DebateMode.learning => 'Start learning session',
-  };
-
-  String _hint(bool locked) {
-    if (locked) return 'Daily limit reached. Resets tomorrow.';
-    if (_side == null) {
-      return "Pick a side to debate today's topic.";
-    }
-    final other = _side == 'For' ? 'against' : 'for';
-    return 'You argue ${_side!.toLowerCase()}. ClashBot argues $other.';
-  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final w = widget;
-    final locked = w.quota.isLocked;
-    final canStart = !locked;
+    final locked = quota.isLocked;
+    final rankName = RankModel.rankData[rank]!['name'] as String;
+    final nextIndex = DebateRank.values.indexOf(rank) + 1;
+    final DebateRank? next = nextIndex < DebateRank.values.length
+        ? DebateRank.values[nextIndex]
+        : null;
+    final toNext = next == null
+        ? null
+        : (RankModel.rankData[next]!['minPoints'] as int) - points;
 
     return StaggeredColumn(
       children: [
-        _TopLine(
-          displayName: w.displayName,
-          avatarSeed: w.avatarSeed,
-          rank: w.rank,
-          rankColor: w.rankColor,
-          points: w.points,
-          quota: w.quota,
-          onTapAvatar: w.onTapAvatar,
+        _ArenaTop(
+          displayName: displayName,
+          avatarSeed: avatarSeed,
+          rankName: rankName,
+          rankColor: rankColor,
+          points: points,
+          streak: streak,
+          quota: quota,
+          onTapAvatar: onTapAvatar,
         ),
-        AppSpacing.vXxxl,
-
-        // 1 · Mode first: it decides what Start does.
-        const AppSectionLabel(
-          '1 · Choose a mode',
-          padding: EdgeInsets.only(bottom: AppSpacing.sm),
-        ),
-        AppTextTabs(
-          labels: const ['Casual', 'Ranked', 'Learning'],
-          index: DebateMode.values.indexOf(w.mode),
-          onChanged: (i) => w.onModeChanged(DebateMode.values[i]),
+        AppSpacing.vXl,
+        _MatchCard(
+          motion: Motions.forDay(),
+          locked: locked,
+          onStart: onStartToday,
         ),
         AppSpacing.vMd,
-        Text(
-          _describe(w.mode),
-          style: context.text.bodySmall?.copyWith(color: c.textSecondary),
-        ),
-        AppSpacing.vXxxl,
-
-        // 2 · The topic and which side you argue.
-        const AppSectionLabel(
-          "2 · Today's topic",
-          padding: EdgeInsets.only(bottom: AppSpacing.sm),
-        ),
-        Text(
-          Motions.forDay(),
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.headlineMedium?.copyWith(height: 1.12),
-        ),
-        AppSpacing.vMd,
-        Text(
-          'Which side will you argue? ClashBot argues the opposite.',
-          style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
-        ),
-        AppSpacing.vLg,
         Row(
           children: [
             Expanded(
-              child: _SideButton(
-                label: 'For',
-                caption: 'I agree with it',
-                color: c.positiveText,
-                tint: c.positiveBg,
-                selected: _side == 'For',
+              child: _ArenaDoor(
+                title: 'Casual',
+                subtitle: 'Your topic, your rules.',
+                color: c.textPrimary,
                 enabled: !locked,
-                onTap: () => setState(() => _side = 'For'),
+                onTap: () => onOpenMode(DebateMode.casual),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _SideButton(
-                label: 'Against',
-                caption: 'I disagree with it',
-                color: c.negativeText,
-                tint: c.negativeBg,
-                selected: _side == 'Against',
+              child: _ArenaDoor(
+                title: 'Ranked',
+                subtitle: '+50 on the line.',
+                color: c.rankText,
                 enabled: !locked,
-                onTap: () => setState(() => _side = 'Against'),
+                onTap: () => onOpenMode(DebateMode.ranked),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ArenaDoor(
+                title: 'Learning',
+                subtitle: 'Coach tips every turn.',
+                color: c.infoText,
+                enabled: !locked,
+                onTap: () => onOpenMode(DebateMode.learning),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ArenaDoor(
+                title: 'Own topic',
+                subtitle: 'Write a motion.',
+                color: c.textPrimary,
+                enabled: !locked,
+                onTap: () => onOpenMode(DebateMode.casual),
               ),
             ),
           ],
         ),
         AppSpacing.vXl,
-
-        // 3 · One obvious action.
-        AppButton.primary(
-          label: _cta(w.mode),
-          icon: AppIcons.play,
-          // Always live: with a side picked it starts today's topic at once;
-          // otherwise it opens the guided flow (topic, side, setup).
-          onPressed: !canStart
+        _RankLine(
+          rankName: rankName,
+          rankColor: rankColor,
+          points: points,
+          toNext: toNext,
+          nextName: next == null
               ? null
-              : _side != null
-                  ? () => w.onPickSide(_side!)
-                  : w.onWriteOwn,
+              : RankModel.rankData[next]!['name'] as String,
+          progress: RankModel.getRankProgress(points),
         ),
-        AppSpacing.vSm,
-        Text(
-          _hint(locked),
-          textAlign: TextAlign.center,
-          style: context.text.labelSmall?.copyWith(color: c.textHint),
-        ),
-        AppSpacing.vLg,
-        AppButton.secondary(
-          label: 'Debate ClashBot on your own topic',
-          icon: AppIcons.ai,
-          onPressed: locked ? null : w.onWriteOwn,
-        ),
-        if (w.recent.isNotEmpty) ...[
-          AppSectionLabel(
-            'Recent',
-            actionLabel: 'See all',
-            onAction: w.onSeeAll,
-          ),
+        if (recent.isNotEmpty) ...[
+          AppSectionLabel('Recent', actionLabel: 'See all', onAction: onSeeAll),
           AppRows(
             children: [
-              for (final r in w.recent.take(3))
+              for (final r in recent.take(3))
                 AppPlainRow(
                   title: r.topic,
-                  subtitle: _PhoneHome._recentSubtitle(r),
+                  subtitle: _recentSubtitle(r),
                   leading: ScoreNumber(r.score),
                   trailing: Text(
-                    _PhoneHome._when(r.date),
+                    _when(r.date),
                     style: context.mono(size: 11, color: c.textHint),
                   ),
-                  onTap: () => w.onOpenRecord(r),
+                  onTap: () => onOpenRecord(r),
                 ),
             ],
           ),
@@ -516,22 +464,24 @@ class _PhoneHomeState extends State<_PhoneHome> {
   }
 }
 
-/// Avatar + name + rank line on the left, today's quota on the right.
-class _TopLine extends StatelessWidget {
+/// Avatar + name + rank on the left; streak (or today's quota) on the right.
+class _ArenaTop extends StatelessWidget {
   final String displayName;
   final String avatarSeed;
-  final DebateRank rank;
+  final String rankName;
   final Color rankColor;
   final int points;
+  final int streak;
   final UsageQuotaState quota;
   final VoidCallback onTapAvatar;
 
-  const _TopLine({
+  const _ArenaTop({
     required this.displayName,
     required this.avatarSeed,
-    required this.rank,
+    required this.rankName,
     required this.rankColor,
     required this.points,
+    required this.streak,
     required this.quota,
     required this.onTapAvatar,
   });
@@ -539,11 +489,7 @@ class _TopLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final rankName = (RankModel.rankData[rank]!['name'] as String)
-        .toUpperCase();
-
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         UserAvatar(
           seed: avatarSeed,
@@ -551,13 +497,11 @@ class _TopLine extends StatelessWidget {
           ringColor: rankColor,
           ringWidth: 2,
           onTap: onTapAvatar,
-          semanticLabel: 'Profile',
         ),
-        AppSpacing.hMd,
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 displayName,
@@ -565,11 +509,8 @@ class _TopLine extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: context.text.labelLarge,
               ),
-              const SizedBox(height: AppSpacing.xxs),
               Text(
-                '$rankName · $points pts',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                '${rankName.toUpperCase()} · $points pts',
                 style: context.text.labelSmall?.copyWith(
                   color: c.rankText,
                   fontWeight: FontWeight.w700,
@@ -578,43 +519,162 @@ class _TopLine extends StatelessWidget {
             ],
           ),
         ),
-        AppSpacing.hMd,
-        Text.rich(
-          TextSpan(
+        if (streak > 0)
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              TextSpan(
-                text: '${quota.usedToday}',
-                style: context.mono(size: 11, color: c.textSecondary),
-              ),
-              TextSpan(
-                text: '/${quota.dailyLimit} today',
-                style: context.text.labelSmall?.copyWith(color: c.textHint),
+              Icon(AppIcons.hard, size: 16, color: c.accent),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                '$streak day streak',
+                style: context.text.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
+          )
+        else
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '${quota.usedToday}',
+                  style: context.mono(size: 11, color: c.textSecondary),
+                ),
+                TextSpan(
+                  text: '/${quota.dailyLimit} today',
+                  style: context.text.labelSmall?.copyWith(color: c.textHint),
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
-/// One of the two 64 px side buttons: the only raised surface on the phone
-/// Home, because this is the screen's one action.
-class _SideButton extends StatelessWidget {
+/// The hero: today's preset match with one Start button.
+class _MatchCard extends StatelessWidget {
+  final String motion;
+  final bool locked;
+  final VoidCallback onStart;
+
+  const _MatchCard({
+    required this.motion,
+    required this.locked,
+    required this.onStart,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AppCard(
+      clip: true,
+      padding: const EdgeInsets.all(AppSpacing.lg + 2),
+      radius: BorderRadius.circular(22),
+      child: Stack(
+        children: [
+          // Soft flame wash in the top-right corner (the one allowed gradient).
+          Positioned(
+            top: -60,
+            right: -60,
+            child: IgnorePointer(
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      c.accent.withValues(alpha: 0.16),
+                      c.accent.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSectionLabel("Today's match", padding: EdgeInsets.zero),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                motion,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.15,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'ClashBot is ready on the other side. Pick a side in the next step.',
+                style: context.text.bodySmall?.copyWith(color: c.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.lg,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  _Meta(label: 'Opponent', value: 'Medium'),
+                  _Meta(label: 'Clock', value: '5:00'),
+                  _Meta(label: 'Mode', value: 'Casual'),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              AppButton.primary(
+                label: locked ? 'Daily limit reached' : "Start today's debate",
+                icon: locked ? null : AppIcons.play,
+                onPressed: locked ? null : onStart,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Meta extends StatelessWidget {
   final String label;
-  final String caption;
+  final String value;
+  const _Meta({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label ',
+            style: context.text.labelSmall?.copyWith(color: c.textHint),
+          ),
+          TextSpan(
+            text: value,
+            style: context.mono(size: 11, color: c.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of the four doors under the hero.
+class _ArenaDoor extends StatelessWidget {
+  final String title;
+  final String subtitle;
   final Color color;
-  final Color tint;
-  final bool selected;
   final bool enabled;
   final VoidCallback onTap;
 
-  const _SideButton({
-    required this.label,
-    required this.caption,
+  const _ArenaDoor({
+    required this.title,
+    required this.subtitle,
     required this.color,
-    required this.tint,
-    required this.selected,
     required this.enabled,
     required this.onTap,
   });
@@ -622,44 +682,92 @@ class _SideButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final fg = enabled ? color : c.textHint;
-
-    return Pressable(
+    return AppCard(
       onTap: enabled ? onTap : null,
-      enabled: enabled,
-      pressedScale: 0.96,
-      semanticLabel: '$label: $caption',
-      child: AnimatedContainer(
-        duration: AppDurations.fast,
-        curve: Curves.easeOutCubic,
-        height: 68,
-        decoration: BoxDecoration(
-          color: selected ? tint : c.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? fg : c.borderStrong,
-            width: selected ? 1.5 : 1,
+      padding: const EdgeInsets.all(AppSpacing.md + 2),
+      radius: AppRadius.mdAll,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: context.text.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: enabled ? color : c.textHint,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.labelSmall?.copyWith(color: c.textHint),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Newcomer · 80 pts to Challenger" with a thin bar and the points.
+class _RankLine extends StatelessWidget {
+  final String rankName;
+  final Color rankColor;
+  final int points;
+  final int? toNext;
+  final String? nextName;
+  final double progress;
+
+  const _RankLine({
+    required this.rankName,
+    required this.rankColor,
+    required this.points,
+    required this.toNext,
+    required this.nextName,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final caption = toNext == null || nextName == null
+        ? 'Top rank reached'
+        : '$toNext pts to $nextName';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: rankName,
+                      style: context.text.labelMedium?.copyWith(
+                        color: c.rankText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' · $caption',
+                      style: context.text.labelMedium?.copyWith(
+                        color: c.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AppProgressBar(value: progress, height: 5, color: rankColor),
+            ],
           ),
         ),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: context.text.titleSmall?.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              caption,
-              style: context.text.labelSmall?.copyWith(color: c.textHint),
-            ),
-          ],
-        ),
-      ),
+        const SizedBox(width: AppSpacing.lg),
+        AnimatedNumber(value: points, size: 16, color: c.textSecondary),
+      ],
     );
   }
 }

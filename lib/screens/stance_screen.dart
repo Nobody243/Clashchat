@@ -12,7 +12,17 @@ class StanceScreen extends StatefulWidget {
   final String topic;
   final DebateMode mode;
 
-  const StanceScreen({super.key, required this.topic, required this.mode});
+  /// Home's "Start today's debate": after the side is picked, go straight
+  /// into a preset casual match (Medium opponent, 5-minute clock) instead of
+  /// the setup screen.
+  final bool quickMatch;
+
+  const StanceScreen({
+    super.key,
+    required this.topic,
+    required this.mode,
+    this.quickMatch = false,
+  });
 
   @override
   State<StanceScreen> createState() => _StanceScreenState();
@@ -23,11 +33,13 @@ class _StanceScreenState extends State<StanceScreen> {
 
   String get _stance => _isFor ? 'For' : 'Against';
 
-  String get _ctaLabel => switch (widget.mode) {
-        DebateMode.learning => 'Start learning session',
-        DebateMode.ranked => 'Continue to ranked setup',
-        DebateMode.casual => 'Continue',
-      };
+  String get _ctaLabel => widget.quickMatch
+      ? 'Start debate'
+      : switch (widget.mode) {
+          DebateMode.learning => 'Start learning session',
+          DebateMode.ranked => 'Continue to ranked setup',
+          DebateMode.casual => 'Continue',
+        };
 
   void _select(bool isFor) {
     if (_isFor == isFor) return;
@@ -35,6 +47,21 @@ class _StanceScreenState extends State<StanceScreen> {
   }
 
   void _nextStep() {
+    if (widget.quickMatch) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            topic: widget.topic,
+            stance: _isFor ? 'For' : 'Against',
+            difficulty: 'Medium',
+            timerMinutes: 5,
+            mode: DebateMode.casual,
+          ),
+        ),
+      );
+      return;
+    }
     if (widget.mode == DebateMode.learning) {
       Navigator.push(
         context,
