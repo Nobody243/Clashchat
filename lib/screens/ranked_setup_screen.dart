@@ -8,7 +8,7 @@ import '../ui/ui.dart';
 import '../widgets/setup_back_button.dart';
 import 'chat_screen.dart';
 
-class RankedSetupScreen extends StatelessWidget {
+class RankedSetupScreen extends StatefulWidget {
   final String topic;
   final String stance;
 
@@ -18,6 +18,26 @@ class RankedSetupScreen extends StatelessWidget {
     required this.stance,
   });
 
+  @override
+  State<RankedSetupScreen> createState() => _RankedSetupScreenState();
+}
+
+class _RankedSetupScreenState extends State<RankedSetupScreen> {
+  static const int quickMinutes = 5;
+  static const int fullMin = 10;
+  static const int fullMax = 30;
+  static const List<int> _fullPicks = [10, 20, 30];
+
+  /// 0 = Quick (5 min), 1 = Full match (10–30 min).
+  int _format = 0;
+  int _fullMinutes = fullMin;
+
+  int get _minutes => _format == 0 ? quickMinutes : _fullMinutes;
+  String get _timerLabel => '${_minutes.toString().padLeft(2, '0')}:00';
+
+  String get topic => widget.topic;
+  String get stance => widget.stance;
+
   void _start(BuildContext context, String difficulty) {
     Navigator.push(
       context,
@@ -26,7 +46,7 @@ class RankedSetupScreen extends StatelessWidget {
           topic: topic,
           stance: stance,
           difficulty: difficulty,
-          timerMinutes: 10, // always 10 in ranked
+          timerMinutes: _minutes, // ranked is always timed
           mode: DebateMode.ranked,
         ),
       ),
@@ -41,7 +61,8 @@ class RankedSetupScreen extends StatelessWidget {
           .doc(AuthService.currentUser!.uid)
           .snapshots(),
       builder: (context, snapshot) {
-        final waiting = snapshot.connectionState == ConnectionState.waiting &&
+        final waiting =
+            snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData;
         final points = snapshot.data?.data()?['rankPoints'] ?? 0;
         final rank = RankModel.getRankFromPoints(points);
@@ -54,12 +75,12 @@ class RankedSetupScreen extends StatelessWidget {
         return SetupScaffold(
           step: 3,
           title: 'Ranked debate',
-          subtitle: 'The terms are fixed. Your rank sets the opponent.',
+          subtitle: 'Your rank sets the opponent. You pick the clock.',
           summary: SetupSummary(
             topic: topic,
             stance: stance,
             difficulty: waiting ? null : rankName,
-            timer: '10:00',
+            timer: _timerLabel,
           ),
           cta: AppButton.primary(
             label: 'Start ranked debate',
@@ -78,13 +99,34 @@ class RankedSetupScreen extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const AppSectionHeader(
+                  title: 'Time',
+                  subtitle: 'Every ranked debate runs on a clock.',
+                ),
+                _TimeCard(
+                  format: _format,
+                  fullMinutes: _fullMinutes,
+                  picks: _fullPicks,
+                  min: fullMin,
+                  max: fullMax,
+                  onFormat: (i) => setState(() => _format = i),
+                  onMinutes: (m) => setState(() => _fullMinutes = m),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 const AppSectionHeader(title: 'Match rules'),
                 AppListGroup(
                   children: [
                     _RuleRow(
                       icon: AppIcons.timer,
                       label: 'Timer',
-                      trailing: Text('10:00', style: context.mono(size: 16)),
+                      trailing: Text(
+                        _timerLabel,
+                        style: context.mono(size: 16),
+                      ),
                     ),
                     _RuleRow(
                       icon: AppIcons.forDifficulty(rankName),
@@ -334,6 +376,114 @@ class _PointsColumn extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         child,
       ],
+    );
+  }
+}
+
+/// Quick (5 min) vs Full match (10–30 min). The full-match controls reveal
+/// with an [AnimatedSize]; quick picks set the slider.
+class _TimeCard extends StatelessWidget {
+  final int format;
+  final int fullMinutes;
+  final List<int> picks;
+  final int min;
+  final int max;
+  final ValueChanged<int> onFormat;
+  final ValueChanged<int> onMinutes;
+
+  const _TimeCard({
+    required this.format,
+    required this.fullMinutes,
+    required this.picks,
+    required this.min,
+    required this.max,
+    required this.onFormat,
+    required this.onMinutes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final isFull = format == 1;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppSegmented(
+            labels: const ['Quick · 5 min', 'Full match'],
+            icons: const [AppIcons.timer, AppIcons.ranked],
+            index: format,
+            onChanged: onFormat,
+          ),
+          AnimatedSize(
+            duration: AppDurations.normal,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: isFull
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: AppSpacing.lg),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          AnimatedNumber(value: fullMinutes, size: 32),
+                          const SizedBox(width: AppSpacing.xs),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 5),
+                            child: Text(
+                              'min',
+                              style: context.text.labelLarge?.copyWith(
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          for (final m in picks) ...[
+                            Pressable(
+                              onTap: () => onMinutes(m),
+                              child: AppPill(
+                                label: '$m',
+                                mono: true,
+                                tone: m == fullMinutes
+                                    ? AppPillTone.accent
+                                    : AppPillTone.neutral,
+                              ),
+                            ),
+                            if (m != picks.last)
+                              const SizedBox(width: AppSpacing.xs + 2),
+                          ],
+                        ],
+                      ),
+                      SliderTheme(
+                        data: SliderTheme.of(
+                          context,
+                        ).copyWith(padding: EdgeInsets.zero),
+                        child: Slider(
+                          value: fullMinutes.toDouble(),
+                          min: min.toDouble(),
+                          max: max.toDouble(),
+                          divisions: max - min,
+                          label: '$fullMinutes min',
+                          onChanged: (v) => onMinutes(v.round()),
+                        ),
+                      ),
+                      Text(
+                        'A full match gives the judge more to weigh. Points follow your score either way.',
+                        style: context.text.bodySmall,
+                      ),
+                    ],
+                  )
+                : Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.md),
+                    child: Text(
+                      'Five minutes, sharp. Make every message count.',
+                      style: context.text.bodySmall,
+                    ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

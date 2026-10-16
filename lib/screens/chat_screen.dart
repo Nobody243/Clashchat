@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'results_screen.dart';
-import 'home_screen.dart';
 import '../models/chat_message.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/typing_indicator.dart';
@@ -56,6 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isAiTyping = false;
   bool _isSending = false;
   bool _isEnding = false;
+  String _endTitle = 'Scoring your debate';
 
   /// Dicebear seed for the user's avatar column on wide layouts.
   String? _avatarSeed;
@@ -106,17 +106,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _onTimerExpired() {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Time's up. Scoring your debate..."),
-        duration: Duration(seconds: 2),
-      ),
-    );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) _scoreAndEndDebate();
-    });
+    _endTitle = "Time's up";
+    _scoreAndEndDebate();
   }
 
   @override
@@ -288,11 +279,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const _ScoringOverlay(),
-    );
+    // The chat is replaced by the scoring view (see build) until the
+    // results route takes over, so the conversation never flashes back.
 
     final result = await AiService.scoreDebate(
       topic: widget.topic,
@@ -302,7 +290,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (!mounted) return;
-    Navigator.of(context).pop(); // close loading
 
     debugPrint(
       'SCORE RESULT: ${result['score']} (Type: ${result['score'].runtimeType})',
@@ -312,11 +299,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final finalScore = result['score'] is int
         ? result['score'] as int
         : int.tryParse(result['score'].toString()) ?? 65;
-    final strengths = (result['strengths'] as List?)
+    final strengths =
+        (result['strengths'] as List?)
             ?.map((item) => item.toString())
             .toList() ??
         const <String>[];
-    final weaknesses = (result['weaknesses'] as List?)
+    final weaknesses =
+        (result['weaknesses'] as List?)
             ?.map((item) => item.toString())
             .toList() ??
         const <String>[];
@@ -328,8 +317,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.mode == DebateMode.ranked) {
       pointsEarned = RankModel.calculatePointsEarned(finalScore, true);
       try {
-        final userDocRef =
-            FirebaseFirestore.instance.collection('users').doc(currentUser.uid);
+        final userDocRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid);
         await FirebaseFirestore.instance.runTransaction((transaction) async {
           final snapshot = await transaction.get(userDocRef);
           if (!snapshot.exists) return;
@@ -339,10 +329,9 @@ class _ChatScreenState extends State<ChatScreen> {
           final rankAtTime = RankModel.getRankFromPoints(currentPoints);
           currentRank = RankModel.rankData[rankAtTime]!['name'] as String;
           final newPoints = currentPoints + pointsEarned;
-          transaction.update(
-            userDocRef,
-            {'rankPoints': newPoints < 0 ? 0 : newPoints},
-          );
+          transaction.update(userDocRef, {
+            'rankPoints': newPoints < 0 ? 0 : newPoints,
+          });
         });
       } catch (e) {
         debugPrint('Error updating rank points: $e');
@@ -354,7 +343,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Calculate duration: use elapsed time if timer was running, otherwise estimate from messages
     final int durationMinutes = widget.timerMinutes != null
         ? _timerService.elapsedMinutes
-        : ((_messages.length * 2) / 60).ceil(); // estimate 2 seconds per message
+        : ((_messages.length * 2) / 60)
+              .ceil(); // estimate 2 seconds per message
 
     debugPrint(
       'SAVING TO FIRESTORE - Score: $finalScore (Type: ${finalScore.runtimeType})',
@@ -365,45 +355,35 @@ class _ChatScreenState extends State<ChatScreen> {
         .doc(currentUser.uid)
         .collection('history')
         .add({
-      'topic': widget.topic,
-      'stance': widget.stance,
-      'difficulty': widget.difficulty,
-      'score': finalScore,
-      'mode': widget.mode.name,
-      'summary': summary,
-      'strengths': strengths,
-      'weaknesses': weaknesses,
-      'messageCount': _messages.length,
-      'date': DateTime.now().toIso8601String(),
-      'status': 'completed',
-      'isRanked': widget.mode == DebateMode.ranked,
-      'pointsEarned': pointsEarned,
-      'timerMinutes': widget.timerMinutes,
-      'durationMinutes': durationMinutes,
-      'rankAtTime': currentRank,
-      'messages': _messages
-          .map(
-            (m) => {
-              'text': m.text,
-              'isUser': m.isUser,
-              'timestamp': m.timestamp.toIso8601String(),
-              'coachTip': m.coachTip,
-            },
-          )
-          .toList(),
-    });
+          'topic': widget.topic,
+          'stance': widget.stance,
+          'difficulty': widget.difficulty,
+          'score': finalScore,
+          'mode': widget.mode.name,
+          'summary': summary,
+          'strengths': strengths,
+          'weaknesses': weaknesses,
+          'messageCount': _messages.length,
+          'date': DateTime.now().toIso8601String(),
+          'status': 'completed',
+          'isRanked': widget.mode == DebateMode.ranked,
+          'pointsEarned': pointsEarned,
+          'timerMinutes': widget.timerMinutes,
+          'durationMinutes': durationMinutes,
+          'rankAtTime': currentRank,
+          'messages': _messages
+              .map(
+                (m) => {
+                  'text': m.text,
+                  'isUser': m.isUser,
+                  'timestamp': m.timestamp.toIso8601String(),
+                  'coachTip': m.coachTip,
+                },
+              )
+              .toList(),
+        });
 
     if (!mounted) return;
-
-    if (widget.mode == DebateMode.learning) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
-        ),
-        (_) => false,
-      );
-      return;
-    }
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
@@ -465,6 +445,16 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final twoPane = context.isExpanded || context.isLarge;
+
+    if (_isEnding) {
+      return PopScope(
+        canPop: false,
+        child: Scaffold(
+          backgroundColor: context.colors.background,
+          body: _ScoringOverlay(title: _endTitle),
+        ),
+      );
+    }
 
     return PopScope(
       canPop: false,
@@ -621,11 +611,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _aiAvatar() => const AppIconTile(
-        icon: AppIcons.ai,
-        size: 28,
-        iconSize: 16,
-        radius: BorderRadius.all(Radius.circular(14)),
-      );
+    icon: AppIcons.ai,
+    size: 28,
+    iconSize: 16,
+    radius: BorderRadius.all(Radius.circular(14)),
+  );
 
   Widget _userAvatar() {
     final seed = _avatarSeed;
@@ -657,8 +647,9 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         final message = _messages[index];
         final prevMsg = index > 0 ? _messages[index - 1] : null;
-        final nextMsg =
-            index + 1 < _messages.length ? _messages[index + 1] : null;
+        final nextMsg = index + 1 < _messages.length
+            ? _messages[index + 1]
+            : null;
         final isLast = nextMsg == null || nextMsg.isUser != message.isUser;
         return MessageBubble(
           message: message,
@@ -745,9 +736,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     Expanded(
                       child: Text(
                         'Messages',
-                        style: text.bodySmall?.copyWith(
-                          color: c.textSecondary,
-                        ),
+                        style: text.bodySmall?.copyWith(color: c.textSecondary),
                       ),
                     ),
                     AnimatedNumber(value: _messages.length, size: 16),
@@ -833,7 +822,9 @@ class _SizeReporterState extends State<_SizeReporter> {
 // Scoring overlay (shown while AiService.scoreDebate runs)
 // ══════════════════════════════════════════════════════════
 class _ScoringOverlay extends StatefulWidget {
-  const _ScoringOverlay();
+  const _ScoringOverlay({this.title = 'Scoring your debate'});
+
+  final String title;
 
   @override
   State<_ScoringOverlay> createState() => _ScoringOverlayState();
@@ -870,49 +861,46 @@ class _ScoringOverlayState extends State<_ScoringOverlay> {
     final c = context.colors;
     final text = context.text;
 
-    return Dialog.fullscreen(
-      backgroundColor: c.background,
-      child: AppBackdrop(
-        intensity: 0.7,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl),
-            child: StaggeredColumn(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const AppSkeleton.circle(size: 120),
-                const SizedBox(height: AppSpacing.xxl),
-                Text(
-                  'Scoring your debate',
-                  textAlign: TextAlign.center,
-                  style: text.titleMedium,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                AnimatedSwitcher(
-                  duration: kRevealDuration,
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeOutCubic,
-                  transitionBuilder: (child, anim) => FadeTransition(
-                    opacity: anim,
-                    child: SlideTransition(
-                      position: anim.drive(
-                        Tween<Offset>(
-                          begin: const Offset(0, 0.3),
-                          end: Offset.zero,
-                        ),
+    return AppBackdrop(
+      intensity: 0.7,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl),
+          child: StaggeredColumn(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const AppSkeleton.circle(size: 120),
+              const SizedBox(height: AppSpacing.xxl),
+              Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: text.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              AnimatedSwitcher(
+                duration: kRevealDuration,
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeOutCubic,
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: anim.drive(
+                      Tween<Offset>(
+                        begin: const Offset(0, 0.3),
+                        end: Offset.zero,
                       ),
-                      child: child,
                     ),
-                  ),
-                  child: Text(
-                    _steps[_step],
-                    key: ValueKey(_step),
-                    textAlign: TextAlign.center,
-                    style: text.bodySmall?.copyWith(color: c.textSecondary),
+                    child: child,
                   ),
                 ),
-              ],
-            ),
+                child: Text(
+                  _steps[_step],
+                  key: ValueKey(_step),
+                  textAlign: TextAlign.center,
+                  style: text.bodySmall?.copyWith(color: c.textSecondary),
+                ),
+              ),
+            ],
           ),
         ),
       ),
