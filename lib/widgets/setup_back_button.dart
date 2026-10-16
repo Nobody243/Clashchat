@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../models/debate_mode.dart';
 import '../ui/ui.dart';
 
 /// Chrome shared by the three-step debate setup flow (topic, stance, terms).
 ///
 /// * [SetupBackButton]   back affordance (top-left of every step)
-/// * [SetupStepDots]     "1 of 3" progress pills
+/// * [SetupStepDots]     "1 of 3" progress pills (wide layouts; phones use
+///                       the kit's `AppStepBar`)
 /// * [SetupScaffold]     the page skeleton: backdrop, header, staggered
 ///                       content, bottom-anchored CTA on phones, sticky
 ///                       summary panel on wide screens
 /// * [SetupSummaryPanel] what has been chosen so far
 /// * [SetupRadioMark] / [SetupDifficultyRow] single-choice rows
+/// * [SetupChip]         38 px text chip for clock lengths (phones)
 ///
 /// Everything here composes the kit in `lib/ui`; nothing invents a style.
 
@@ -22,7 +25,15 @@ class SetupBackButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool filled;
 
-  const SetupBackButton({super.key, this.onPressed, this.filled = true});
+  /// Glyph size; phones use a plain 24 px arrow (DESIGN.md §10).
+  final double iconSize;
+
+  const SetupBackButton({
+    super.key,
+    this.onPressed,
+    this.filled = true,
+    this.iconSize = 20,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +41,7 @@ class SetupBackButton extends StatelessWidget {
       icon: AppIcons.back,
       tooltip: 'Back',
       filled: filled,
+      iconSize: iconSize,
       onPressed: () {
         HapticFeedback.lightImpact();
         if (onPressed != null) {
@@ -214,7 +226,11 @@ class _SummaryRow extends StatelessWidget {
 
 /// Page skeleton for one setup step.
 ///
-/// * compact (< 600): single column, CTA bottom-anchored above the keyboard
+/// * compact (< 600): plain back arrow + [AppStepBar], then [compactChildren]
+///   (the phone composition, DESIGN.md §10: eyebrow, motion, rows, chips) in a
+///   scroll view, CTA bottom-anchored above the keyboard. No summary panel,
+///   no header block; each screen owns its phone content. Falls back to the
+///   header + [children] when [compactChildren] is null.
 /// * medium (600–899): single 560 px column, CTA inline after the content
 /// * expanded (≥ 900): content column (max 620) left, sticky [SetupSummaryPanel]
 ///   (300 px glass) right; CTA inline
@@ -227,6 +243,10 @@ class SetupScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final List<Widget> children;
+
+  /// Phone-only content (< 600). Blocks are laid out as given, with no gap
+  /// inserted between them; put spacing inside the blocks.
+  final List<Widget>? compactChildren;
   final Widget cta;
   final SetupSummary summary;
   final VoidCallback? onBack;
@@ -239,6 +259,7 @@ class SetupScaffold extends StatelessWidget {
     required this.children,
     required this.cta,
     required this.summary,
+    this.compactChildren,
     this.totalSteps = 3,
     this.onBack,
   });
@@ -286,7 +307,8 @@ class SetupScaffold extends StatelessWidget {
     final gutter = context.pageGutter;
 
     if (context.isCompact) {
-      final blocks = _blocks(context, withCta: false);
+      final phone = compactChildren;
+      final blocks = phone ?? _blocks(context, withCta: false);
       return Scaffold(
         body: AppPage(
           width: AppPageWidth.form,
@@ -296,15 +318,45 @@ class SetupScaffold extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (phone != null)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    gutter - AppSpacing.md,
+                    AppSpacing.sm,
+                    gutter,
+                    AppSpacing.sm,
+                  ),
+                  child: AppReveal(
+                    child: Row(
+                      children: [
+                        SetupBackButton(
+                          onPressed: onBack,
+                          filled: false,
+                          iconSize: 24,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Semantics(
+                            label: 'Step $step of $totalSteps',
+                            child: AppStepBar(step: step, total: totalSteps),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     gutter,
-                    AppSpacing.lg,
+                    phone != null ? AppSpacing.xl : AppSpacing.lg,
                     gutter,
                     AppSpacing.sm,
                   ),
-                  child: StaggeredColumn(children: blocks),
+                  child: StaggeredColumn(
+                    startIndex: phone != null ? 1 : 0,
+                    children: blocks,
+                  ),
                 ),
               ),
               SafeArea(
@@ -316,7 +368,7 @@ class SetupScaffold extends StatelessWidget {
                     gutter,
                     AppSpacing.lg,
                   ),
-                  child: AppReveal(index: blocks.length, child: cta),
+                  child: AppReveal(index: blocks.length + 1, child: cta),
                 ),
               ),
             ],
@@ -379,12 +431,12 @@ class SetupScaffold extends StatelessWidget {
   }
 }
 
-/// Radio-like trailing indicator: accent check when selected, an 18 px
-/// outline circle otherwise.
+/// Radio mark: a 20 px ring in `borderStrong` that fills with the accent
+/// (and shows an `onAccent` dot) when selected.
 class SetupRadioMark extends StatelessWidget {
   final bool selected;
 
-  /// Colour of the check; defaults to the accent.
+  /// Fill colour when selected; defaults to the accent.
   final Color? color;
 
   const SetupRadioMark({super.key, required this.selected, this.color});
@@ -392,38 +444,40 @@ class SetupRadioMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: AnimatedSwitcher(
+    final fill = color ?? c.accent;
+    return AnimatedContainer(
+      duration: AppDurations.fast,
+      curve: Curves.easeOutCubic,
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? fill : fill.withValues(alpha: 0),
+        border: Border.all(
+          color: selected ? fill : c.borderStrong,
+          width: 1.5,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: AnimatedContainer(
         duration: AppDurations.fast,
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeOutCubic,
-        child: selected
-            ? Icon(
-                AppIcons.checkCircle,
-                key: const ValueKey('on'),
-                size: 22,
-                color: color ?? c.accent,
-              )
-            : Center(
-                key: const ValueKey('off'),
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: c.borderStrong, width: 1.5),
-                  ),
-                ),
-              ),
+        curve: Curves.easeOutCubic,
+        width: selected ? 7 : 0,
+        height: selected ? 7 : 0,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: c.onAccent,
+        ),
       ),
     );
   }
 }
 
-/// One selectable opponent-strength row for an [AppListGroup]: duotone
-/// tile, title, one-line description, trailing radio.
+/// One selectable opponent-strength row.
+///
+/// * phones: a plain hairline row for [AppRows] (title w800, one-line
+///   description, trailing [SetupRadioMark]); no tile
+/// * wide: an [AppListGroup] row with the duotone tile
 class SetupDifficultyRow extends StatelessWidget {
   /// 'easy' | 'medium' | 'hard' (any case).
   final String name;
@@ -451,6 +505,51 @@ class SetupDifficultyRow extends StatelessWidget {
         ? name
         : name[0].toUpperCase() + name.substring(1).toLowerCase();
 
+    if (context.isCompact) {
+      return Semantics(
+        selected: selected,
+        child: Pressable(
+          onTap: onTap,
+          pressedScale: 0.995,
+          semanticLabel: title,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedDefaultTextStyle(
+                        duration: AppDurations.fast,
+                        style: context.text.titleSmall!.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: selected ? c.textPrimary : c.textSecondary,
+                        ),
+                        child: Text(title, maxLines: 1),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        description,
+                        style: context.text.bodySmall?.copyWith(
+                          color: c.textHint,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                SetupRadioMark(selected: selected),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Semantics(
       selected: selected,
       child: AppListRow(
@@ -468,4 +567,72 @@ class SetupDifficultyRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A 38 px text chip for the phone setup flow (clock lengths, formats):
+/// 1 px `borderStrong` hairline, radius 10, `labelLarge` muted; selected
+/// gets the accent hairline, `accentSoft` fill and `textPrimary` label.
+/// Put it in an `Expanded` so a row of chips shares the width evenly.
+class SetupChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// Render the label in the mono face (numbers).
+  final bool mono;
+
+  const SetupChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.mono = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final fg = selected ? c.textPrimary : c.textSecondary;
+    final style = mono
+        ? context.mono(size: 14, color: fg)
+        : context.text.labelLarge!.copyWith(color: fg);
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Pressable(
+        onTap: onTap,
+        pressedScale: 0.97,
+        semanticLabel: label,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          curve: Curves.easeOutCubic,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? c.accentSoft : c.accentSoft.withValues(alpha: 0),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? c.accent : c.borderStrong,
+              width: 1,
+            ),
+          ),
+          child: AnimatedDefaultTextStyle(
+            duration: AppDurations.fast,
+            style: style,
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Display name of a mode for the phone eyebrow ("Casual", "Ranked",
+/// "Learning").
+extension SetupModeLabel on DebateMode {
+  String get setupLabel => switch (this) {
+        DebateMode.casual => 'Casual',
+        DebateMode.ranked => 'Ranked',
+        DebateMode.learning => 'Learning',
+      };
 }

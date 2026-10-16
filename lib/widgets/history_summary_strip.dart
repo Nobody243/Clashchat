@@ -4,13 +4,22 @@ import '../models/debate_record.dart';
 import '../ui/ui.dart';
 import 'history_debate_card.dart';
 
-/// Three stat tiles (Debates / Avg score / Wins) as one [Bento] row. The
-/// numbers count up on first appearance; the average takes the score band
-/// colour. Hidden when there are no records (the list's empty state takes
-/// over).
+/// Debates / Avg score / Wins. The numbers count up on first appearance; the
+/// average takes the score band colour. Hidden when there are no records (the
+/// list's empty state takes over).
+///
+/// Wide layouts: three stat tiles as one [Bento] row. Phones ([compact] =
+/// true, DESIGN.md §10): a plain row of three numbers over small-caps
+/// captions, no tiles.
 class HistorySummaryStrip extends StatelessWidget {
   final List<DebateRecord> records;
-  const HistorySummaryStrip({super.key, required this.records});
+  final bool compact;
+
+  const HistorySummaryStrip({
+    super.key,
+    required this.records,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +28,17 @@ class HistorySummaryStrip extends StatelessWidget {
         (records.map((r) => r.score).reduce((a, b) => a + b) / records.length)
             .round();
     final wins = records.where((r) => r.score >= 70).length;
+    final avgColor = HistoryDebateCard.scoreColor(context, avg);
+
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(child: _Stat(label: 'Debates', value: records.length)),
+          Expanded(child: _Stat(label: 'Avg score', value: avg, color: avgColor)),
+          Expanded(child: _Stat(label: 'Wins', value: wins)),
+        ],
+      );
+    }
 
     return Bento(
       gap: AppSpacing.md,
@@ -38,7 +58,7 @@ class HistorySummaryStrip extends StatelessWidget {
               icon: AppIcons.score,
               label: 'Avg score',
               value: avg,
-              color: HistoryDebateCard.scoreColor(context, avg),
+              color: avgColor,
             ),
           ),
           BentoTile(
@@ -49,6 +69,38 @@ class HistorySummaryStrip extends StatelessWidget {
             ),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Phone stat: 22 px mono number over a small-caps caption. No container.
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value, this.color});
+
+  final String label;
+  final int value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedNumber(value: value, size: 22, color: color),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.labelSmall?.copyWith(
+            color: c.textHint,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }

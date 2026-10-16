@@ -11,6 +11,9 @@ import '../ui/ui.dart';
 /// the mono face to its right. Under 60 s the arc and digits turn terracotta
 /// and pulse; while paused the glyph becomes a pause mark. Tap (when [onTap]
 /// is given) toggles pause / resume.
+///
+/// [compact] (phones, DESIGN.md §10) drops the pill chrome and the glyph: a
+/// 14 px depleting arc and `mm:ss` in `mono(13)`, nothing else.
 class DebateTimerWidget extends StatelessWidget {
   final DebateTimerService timerService;
   final VoidCallback? onTap;
@@ -20,11 +23,15 @@ class DebateTimerWidget extends StatelessWidget {
   /// elsewhere and only the remaining time is known.
   final int? totalSeconds;
 
+  /// Phone rendering: bare arc + digits, no pill.
+  final bool compact;
+
   const DebateTimerWidget({
     super.key,
     required this.timerService,
     this.onTap,
     this.totalSeconds,
+    this.compact = false,
   });
 
   double get _remainingFraction {
@@ -44,38 +51,65 @@ class DebateTimerWidget extends StatelessWidget {
         final isPaused = !timerService.isRunning && remaining > 0;
         final fg = isLow ? c.negativeText : c.textPrimary;
         final arc = isLow ? c.negativeText : c.accent;
+        final arcColor = isPaused ? c.textHint : arc;
 
-        final ring = SizedBox(
-          width: 36,
-          height: 36,
-          child: CustomPaint(
-            painter: _TimerRingPainter(
-              fraction: _remainingFraction,
-              track: c.inset,
-              arc: isPaused ? c.textHint : arc,
-              stroke: 3,
-            ),
-            child: Center(
-              child: Icon(
-                isPaused ? AppIcons.pause : AppIcons.timer,
-                size: 16,
-                color: fg,
+        Widget content;
+        if (compact) {
+          content = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CustomPaint(
+                  painter: _TimerRingPainter(
+                    fraction: _remainingFraction,
+                    track: c.borderStrong,
+                    arc: arcColor,
+                    stroke: 2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Text(
+                timerService.formattedTime,
+                style: context.mono(size: 13, color: isPaused ? c.textHint : fg),
+              ),
+            ],
+          );
+        } else {
+          final ring = SizedBox(
+            width: 36,
+            height: 36,
+            child: CustomPaint(
+              painter: _TimerRingPainter(
+                fraction: _remainingFraction,
+                track: c.inset,
+                arc: arcColor,
+                stroke: 3,
+              ),
+              child: Center(
+                child: Icon(
+                  isPaused ? AppIcons.pause : AppIcons.timer,
+                  size: 16,
+                  color: fg,
+                ),
               ),
             ),
-          ),
-        );
+          );
 
-        Widget content = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ring,
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              timerService.formattedTime,
-              style: context.mono(size: 14, color: fg),
-            ),
-          ],
-        );
+          content = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ring,
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                timerService.formattedTime,
+                style: context.mono(size: 14, color: fg),
+              ),
+            ],
+          );
+        }
 
         if (isLow && !isPaused && !context.reduceMotion) {
           content = content
@@ -88,29 +122,40 @@ class DebateTimerWidget extends StatelessWidget {
               );
         }
 
-        final pill = Container(
-          height: 44,
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xs,
-            AppSpacing.xs,
-            AppSpacing.md,
-            AppSpacing.xs,
-          ),
-          decoration: BoxDecoration(
-            color: c.surfaceRaised,
-            borderRadius: AppRadius.pillAll,
-            border: Border.all(color: c.border),
-          ),
-          alignment: Alignment.center,
-          child: content,
-        );
+        final Widget body;
+        if (compact) {
+          // Keep a 44 px tall touch target without drawing any chrome.
+          body = Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+            alignment: Alignment.center,
+            child: content,
+          );
+        } else {
+          body = Container(
+            height: 44,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xs,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: c.surfaceRaised,
+              borderRadius: AppRadius.pillAll,
+              border: Border.all(color: c.border),
+            ),
+            alignment: Alignment.center,
+            child: content,
+          );
+        }
 
-        if (onTap == null) return pill;
+        if (onTap == null) return body;
         return Pressable(
           onTap: onTap,
           pressedScale: 0.96,
           semanticLabel: isPaused ? 'Resume timer' : 'Pause timer',
-          child: pill,
+          child: body,
         );
       },
     );

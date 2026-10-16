@@ -87,6 +87,13 @@ class _RankedSetupScreenState extends State<RankedSetupScreen> {
             icon: AppIcons.ranked,
             onPressed: waiting ? null : () => _start(context, rankName),
           ),
+          compactChildren: _phoneBlocks(
+            context,
+            waiting: waiting,
+            rankName: rankName,
+            win: win,
+            loss: loss,
+          ),
           children: [
             if (waiting)
               const _OpponentSkeleton()
@@ -155,10 +162,158 @@ class _RankedSetupScreenState extends State<RankedSetupScreen> {
       },
     );
   }
+
+  /// Phone composition (DESIGN.md §10): eyebrow "Ranked · Stance", the
+  /// motion, one line naming the calibrated opponent, clock chips (Quick /
+  /// Full with the 10–30 slider), and the stakes as two mono numbers. No
+  /// hero card, no points card, no rules list.
+  List<Widget> _phoneBlocks(
+    BuildContext context, {
+    required bool waiting,
+    required String rankName,
+    required int win,
+    required int loss,
+  }) {
+    final c = context.colors;
+    final muted = context.text.bodyMedium?.copyWith(color: c.textSecondary);
+    final isFull = _format == 1;
+    return [
+      AppSectionLabel(
+        'Ranked · $stance',
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      ),
+      Text(
+        topic,
+        style: context.text.titleLarge,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      if (waiting)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: AppSkeleton.line(width: 220, height: 14),
+        )
+      else
+        Text.rich(
+          TextSpan(
+            text: 'Opponent calibrated to ',
+            children: [
+              TextSpan(
+                text: rankName,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const TextSpan(text: '.'),
+            ],
+          ),
+          style: muted,
+        ),
+      const AppSectionLabel('Clock'),
+      Row(
+        children: [
+          Expanded(
+            child: SetupChip(
+              label: 'Quick · $quickMinutes min',
+              selected: !isFull,
+              onTap: () => setState(() => _format = 0),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: SetupChip(
+              label: 'Full match',
+              selected: isFull,
+              onTap: () => setState(() => _format = 1),
+            ),
+          ),
+        ],
+      ),
+      AnimatedSize(
+        duration: AppDurations.normal,
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: isFull
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('$_fullMinutes', style: context.mono(size: 32)),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text('min', style: muted),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.sm,
+                      ),
+                    ),
+                    child: Slider(
+                      value: _fullMinutes.toDouble(),
+                      min: fullMin.toDouble(),
+                      max: fullMax.toDouble(),
+                      divisions: fullMax - fullMin,
+                      label: '$_fullMinutes min',
+                      onChanged: (v) =>
+                          setState(() => _fullMinutes = v.round()),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (final m in _fullPicks) ...[
+                        Expanded(
+                          child: SetupChip(
+                            label: '$m',
+                            mono: true,
+                            selected: _fullMinutes == m,
+                            onTap: () => setState(() => _fullMinutes = m),
+                          ),
+                        ),
+                        if (m != _fullPicks.last)
+                          const SizedBox(width: AppSpacing.sm),
+                      ],
+                    ],
+                  ),
+                ],
+              )
+            : const SizedBox(width: double.infinity),
+      ),
+      const AppSectionLabel('Stakes'),
+      Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '+$win',
+              style: context.mono(size: 18, color: c.positiveText),
+            ),
+            const TextSpan(text: ' win · '),
+            TextSpan(
+              text: '$loss',
+              style: context.mono(size: 18, color: c.negativeText),
+            ),
+            const TextSpan(text: ' loss'),
+          ],
+        ),
+        style: muted,
+      ),
+      const SizedBox(height: AppSpacing.xs),
+      Text(
+        'Score 50 or more to win.',
+        style: context.text.bodySmall?.copyWith(color: c.textSecondary),
+      ),
+    ];
+  }
 }
 
-/// "Opponent calibrated to {Rank}": rank tile, title, explainer, and a soft
-/// rank-coloured wash in the top-right corner. The wash is the one place in
+/// Wide layouts. "Opponent calibrated to {Rank}": rank tile, title,
+/// explainer, and a soft rank-coloured wash in the top-right corner. The wash is the one place in
 /// the setup flow a radial gradient is allowed (DESIGN.md §9).
 class _OpponentHero extends StatelessWidget {
   final DebateRank rank;

@@ -70,8 +70,6 @@ class _StanceScreenState extends State<StanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sideBySide = !context.isCompact;
-
     final forCard = StanceButton(
       label: 'For',
       description: 'You argue in favour',
@@ -95,27 +93,22 @@ class _StanceScreenState extends State<StanceScreen> {
         trailingIcon: AppIcons.forward,
         onPressed: _nextStep,
       ),
+      compactChildren: _phoneBlocks(context),
       children: [
         _TopicCard(topic: widget.topic),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (sideBySide)
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: forCard),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: againstCard),
-                  ],
-                ),
-              )
-            else ...[
-              forCard,
-              const SizedBox(height: AppSpacing.md),
-              againstCard,
-            ],
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: forCard),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: againstCard),
+                ],
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             Padding(
               padding: const EdgeInsets.only(left: AppSpacing.xs),
@@ -129,9 +122,120 @@ class _StanceScreenState extends State<StanceScreen> {
       ],
     );
   }
+
+  /// Phone composition (DESIGN.md §10): eyebrow, the motion as the headline,
+  /// one line of guidance, and the split For / Against choice.
+  List<Widget> _phoneBlocks(BuildContext context) {
+    final c = context.colors;
+    return [
+      AppSectionLabel(
+        widget.mode.setupLabel,
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      ),
+      Text(widget.topic, style: context.text.headlineMedium),
+      const SizedBox(height: AppSpacing.sm),
+      Text(
+        'Pick a side. ClashBot takes the other.',
+        style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+      ),
+      const SizedBox(height: AppSpacing.xxl),
+      Row(
+        children: [
+          Expanded(
+            child: _SideButton(
+              label: 'For',
+              caption: 'I agree',
+              positive: true,
+              selected: _isFor,
+              onTap: () => _select(true),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: _SideButton(
+              label: 'Against',
+              caption: 'I disagree',
+              positive: false,
+              selected: !_isFor,
+              onTap: () => _select(false),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
 }
 
-/// Quiet recap of the chosen topic.
+/// One side of the phone's For / Against choice: 72 px, surface fill with a
+/// `borderStrong` hairline, radius 16; the selected side takes a 1.5 px
+/// border in its tone and the tone's soft fill. Same design as Home.
+class _SideButton extends StatelessWidget {
+  final String label;
+  final String caption;
+  final bool positive;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SideButton({
+    required this.label,
+    required this.caption,
+    required this.positive,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final tone = positive ? c.positiveText : c.negativeText;
+    final toneBg = positive ? c.positiveBg : c.negativeBg;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Pressable(
+        onTap: onTap,
+        pressedScale: 0.98,
+        semanticLabel: '$label: $caption',
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          curve: Curves.easeOutCubic,
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          decoration: BoxDecoration(
+            color: selected ? toneBg : c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? tone : c.borderStrong,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: context.text.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: tone,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                caption,
+                style: context.text.labelSmall?.copyWith(
+                  color: selected ? c.textPrimary : c.textHint,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Quiet recap of the chosen topic (wide layouts).
 class _TopicCard extends StatelessWidget {
   final String topic;
   const _TopicCard({required this.topic});

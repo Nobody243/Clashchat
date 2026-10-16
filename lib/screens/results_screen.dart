@@ -72,18 +72,23 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   bool get _celebrate => widget.score >= 70 || widget.pointsEarned > 0;
 
-  Color _scoreColor(BuildContext context) {
-    final c = context.colors;
-    // Same rule as history rows: >=70 positive, 40-69 warning, <40 negative.
-    if (widget.score >= 70) return c.positiveText;
-    if (widget.score >= 40) return c.warningText;
-    return c.negativeText;
-  }
+  Color _scoreColor(BuildContext context) =>
+      scoreBand(widget.score).color(context);
+
+  String get _pointsLabel =>
+      '${widget.pointsEarned < 0 ? '' : '+'}${widget.pointsEarned} pts';
+
+  /// 'hard' → 'Hard'.
+  String get _difficultyWord => widget.difficulty.isEmpty
+      ? 'Medium'
+      : widget.difficulty[0].toUpperCase() +
+          widget.difficulty.substring(1).toLowerCase();
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final twoPane = context.screenWidth >= AppBreakpoints.medium;
+    final compact = context.isCompact;
     final gutter = context.pageGutter;
 
     final column = twoPane ? _buildWide(context) : _buildCompact(context);
@@ -107,7 +112,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     constraints: BoxConstraints(
                       maxWidth: twoPane
                           ? AppPageWidth.wide.maxWidth
-                          : AppPageWidth.content.maxWidth,
+                          : compact
+                              ? AppPageWidth.form.maxWidth
+                              : AppPageWidth.content.maxWidth,
                     ),
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
@@ -136,22 +143,38 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   // ── Layouts ────────────────────────────────────────────────────────────
 
+  /// Phone (DESIGN.md §10): the score is the design. No cards, no pills, no
+  /// icon tiles; hierarchy comes from the 96 px numeral, small-caps labels
+  /// and hairlines.
   Widget _buildCompact(BuildContext context) {
+    final c = context.colors;
     return StaggeredColumn(
       children: [
-        _buildTopRow(context),
-        const SizedBox(height: AppSpacing.lg),
-        _buildHero(context),
-        const SizedBox(height: AppSpacing.xxxl),
-        _buildStats(context),
-        const SizedBox(height: AppSpacing.xxl),
-        _buildStrengths(context),
-        const SizedBox(height: AppSpacing.xxl),
-        _buildWeaknesses(context),
-        if (widget.messages.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.xxl),
-          _buildTranscript(context),
+        _buildCompactTopRow(context),
+        const SizedBox(height: AppSpacing.sm),
+        _buildCompactScore(context),
+        if (widget.summary.trim().isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            widget.summary,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
         ],
+        const SizedBox(height: AppSpacing.xxl),
+        _buildMetaRow(context),
+        _RuledPoints(
+          title: 'What worked',
+          color: c.positiveText,
+          points: widget.strengths,
+        ),
+        _RuledPoints(
+          title: 'What to sharpen',
+          color: c.warningText,
+          points: widget.weaknesses,
+        ),
+        if (widget.messages.isNotEmpty) _buildCompactTranscript(context),
         if (!widget.isFromHistory) ...[
           const SizedBox(height: AppSpacing.xxxl),
           _buildActions(context),
@@ -213,7 +236,134 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  // ── Blocks ─────────────────────────────────────────────────────────────
+  // ── Phone blocks ───────────────────────────────────────────────────────
+
+  Widget _buildCompactTopRow(BuildContext context) {
+    return Row(
+      children: [
+        if (widget.isFromHistory) ...[
+          AppIconButton(
+            icon: AppIcons.back,
+            tooltip: 'Back',
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        const Expanded(
+          child: AppSectionLabel('Final score', padding: EdgeInsets.zero),
+        ),
+      ],
+    );
+  }
+
+  /// 96 px mono numeral counting up, "/100" on its baseline, then the band
+  /// label (and the ranked points on the same line).
+  Widget _buildCompactScore(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+    final band = scoreBand(widget.score);
+    final bandColor = band.color(context);
+    final pointsNegative = widget.pointsEarned < 0;
+
+    final bandStyle = text.labelMedium?.copyWith(
+      color: bandColor,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.2,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            AnimatedNumber(value: widget.score, size: 96, color: c.textPrimary),
+            const SizedBox(width: AppSpacing.xs),
+            Text('/100', style: text.labelLarge?.copyWith(color: c.textHint)),
+          ],
+        ),
+        Row(
+          children: [
+            Text(band.label.toUpperCase(), style: bandStyle),
+            if (_isRanked) ...[
+              Text(' · ', style: bandStyle?.copyWith(color: c.textHint)),
+              Text(
+                _pointsLabel,
+                style: bandStyle?.copyWith(
+                  color: pointsNegative ? c.negativeText : c.rankText,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Hairline-bounded row of three numbers: Messages / Length / Opponent.
+  Widget _buildMetaRow(BuildContext context) {
+    final c = context.colors;
+    final minutes = widget.durationMinutes;
+    final hairline = Divider(height: 1, thickness: 1, color: c.border);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        hairline,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _MetaCell(
+                  caption: 'Messages',
+                  value: '${widget.messages.length}',
+                ),
+              ),
+              Expanded(
+                child: _MetaCell(
+                  caption: 'Length',
+                  value: minutes == null ? '—' : '$minutes:00',
+                ),
+              ),
+              Expanded(
+                child: _MetaCell(caption: 'Opponent', value: _difficultyWord),
+              ),
+            ],
+          ),
+        ),
+        hairline,
+      ],
+    );
+  }
+
+  Widget _buildCompactTranscript(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppSectionLabel(
+          'Transcript',
+          actionLabel: _showTranscript ? 'Hide' : 'Show',
+          onAction: () => setState(() => _showTranscript = !_showTranscript),
+        ),
+        AnimatedSize(
+          duration: AppDurations.normal,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _showTranscript
+              ? _PlainTranscript(messages: widget.messages)
+              : const SizedBox(width: double.infinity, height: 0),
+        ),
+      ],
+    );
+  }
+
+  // ── Wide blocks (unchanged composition) ────────────────────────────────
 
   Widget _buildTopRow(BuildContext context) {
     final text = context.text;
@@ -245,8 +395,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final c = context.colors;
     final text = context.text;
     final pointsNegative = widget.pointsEarned < 0;
-    final pointsLabel =
-        '${pointsNegative ? '' : '+'}${widget.pointsEarned} pts';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -278,7 +426,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
             tone: pointsNegative ? AppPillTone.negative : AppPillTone.rank,
             mono: true,
             icon: AppIcons.points,
-            label: pointsLabel,
+            label: _pointsLabel,
           ),
           // Rank progress card deliberately omitted: this screen is not
           // given the player's rank or current points, and we do not
@@ -369,6 +517,18 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Widget _buildActions(BuildContext context) {
+    if (context.isCompact) {
+      // One action per screen: the primary is the only loud thing here.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppButton.primary(label: 'Debate again', onPressed: _debateAgain),
+          const SizedBox(height: AppSpacing.md),
+          AppButton.secondary(label: 'Back to home', onPressed: _goHome),
+        ],
+      );
+    }
+
     final again = AppButton.primary(
       label: 'Debate again',
       icon: AppIcons.shuffle,
@@ -379,17 +539,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
       icon: AppIcons.home,
       onPressed: _goHome,
     );
-
-    if (context.isCompact) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          again,
-          const SizedBox(height: AppSpacing.md),
-          home,
-        ],
-      );
-    }
 
     return IntrinsicHeight(
       child: Row(
@@ -403,6 +552,167 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// Phone-only pieces
+// ══════════════════════════════════════════════════════════
+
+/// Small-caps caption (uppercased) in [color]. The feedback headings keep
+/// their sentence case because the widget test reads them verbatim.
+class _CapsLabel extends StatelessWidget {
+  const _CapsLabel(this.text, {required this.color, this.uppercase = true});
+
+  final String text;
+  final Color color;
+  final bool uppercase;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      uppercase ? text.toUpperCase() : text,
+      style: context.text.labelSmall?.copyWith(
+        color: color,
+        letterSpacing: uppercase ? 1.4 : 0.8,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+/// One cell of the meta row: mono value over a small-caps caption.
+class _MetaCell extends StatelessWidget {
+  const _MetaCell({required this.caption, required this.value});
+
+  final String caption;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: context.mono(size: 16),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _CapsLabel(caption, color: c.textHint),
+      ],
+    );
+  }
+}
+
+/// A coloured section label followed by each point as a paragraph with a
+/// 2 px left rule. Empty lists collapse to one muted line.
+class _RuledPoints extends StatelessWidget {
+  const _RuledPoints({
+    required this.title,
+    required this.color,
+    required this.points,
+  });
+
+  final String title;
+  final Color color;
+  final List<String> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            top: AppSpacing.xxl,
+            bottom: AppSpacing.sm,
+          ),
+          child: _CapsLabel(title, color: color, uppercase: false),
+        ),
+        if (points.isEmpty)
+          Text(
+            "The judge didn't single anything out.",
+            style: text.bodySmall?.copyWith(color: c.textHint),
+          )
+        else
+          for (var i = 0; i < points.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.sm + 2),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(left: AppSpacing.md),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: c.borderStrong, width: 2),
+                ),
+              ),
+              child: Text(points[i], style: text.bodyMedium),
+            ),
+          ],
+      ],
+    );
+  }
+}
+
+/// Transcript as hairline-separated plain text blocks (no tiles, no card).
+class _PlainTranscript extends StatelessWidget {
+  const _PlainTranscript({required this.messages});
+
+  final List<ChatMessage> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    return AppRows(
+      children: [
+        for (final msg in messages)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _CapsLabel(
+                  msg.isUser ? 'You' : 'ClashBot',
+                  color: msg.isUser ? c.accent : c.textHint,
+                ),
+                const SizedBox(height: AppSpacing.xs + 2),
+                Text(msg.text, style: text.bodyMedium),
+                if (msg.coachTip != null &&
+                    msg.coachTip!.trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(left: AppSpacing.md),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(color: c.infoText, width: 2),
+                      ),
+                    ),
+                    child: Text(
+                      msg.coachTip!,
+                      style: text.bodySmall?.copyWith(color: c.textSecondary),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// Wide transcript (unchanged)
+// ══════════════════════════════════════════════════════════
 
 class _Transcript extends StatelessWidget {
   const _Transcript({required this.messages});

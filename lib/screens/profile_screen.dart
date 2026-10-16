@@ -141,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return AppPage(
-      width: AppPageWidth.wide,
+      width: compact ? AppPageWidth.form : AppPageWidth.wide,
       bottomSafe: false,
       padding: EdgeInsets.fromLTRB(
         gutter,
@@ -189,7 +189,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           totalDebates)
                       .round();
 
-              if (loading) return _ProfileSkeleton(twoColumn: twoColumn);
+              if (loading) {
+                return compact
+                    ? const _PhoneProfileSkeleton()
+                    : _ProfileSkeleton(twoColumn: twoColumn);
+              }
+
+              if (compact) {
+                return _PhoneProfile(
+                  displayName: displayName,
+                  email: email,
+                  bio: _editMode ? '' : bio,
+                  rank: rank,
+                  rankColor: rankColor,
+                  points: rankPoints,
+                  avatarSeed: avatarSeed,
+                  onTapAvatar: () => _pickAvatar(avatarSeed),
+                  debates: totalDebates,
+                  avgScore: avgScore,
+                  wins: wins,
+                  editMode: _editMode,
+                  nameCtrl: _nameCtrl,
+                  bioCtrl: _bioCtrl,
+                  saving: _saving,
+                  onSave: _saveProfile,
+                  onCancel: _cancelEdit,
+                  onEdit: () => setState(() => _editMode = true),
+                  onChangePassword: _changePassword,
+                  onSignOut: _signOut,
+                );
+              }
 
               final hero = _ProfileHero(
                 displayName: displayName,
@@ -704,6 +733,271 @@ class _ProfileSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [left, AppSpacing.vXxl, right],
+    );
+  }
+}
+
+// ── Phone composition (DESIGN.md §10) ────────────────────────────────────────
+
+/// Phones: centered avatar, name, email, rank line and a thin progress bar,
+/// one row of three numbers, then plain account rows. No cards, no tiles.
+class _PhoneProfile extends StatelessWidget {
+  final String displayName;
+  final String email;
+  final String bio;
+  final DebateRank rank;
+  final Color rankColor;
+  final int points;
+  final String? avatarSeed;
+  final VoidCallback onTapAvatar;
+  final int debates;
+  final int avgScore;
+  final int wins;
+  final bool editMode;
+  final TextEditingController nameCtrl;
+  final TextEditingController bioCtrl;
+  final bool saving;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+  final VoidCallback onEdit;
+  final VoidCallback onChangePassword;
+  final VoidCallback onSignOut;
+
+  const _PhoneProfile({
+    required this.displayName,
+    required this.email,
+    required this.bio,
+    required this.rank,
+    required this.rankColor,
+    required this.points,
+    required this.avatarSeed,
+    required this.onTapAvatar,
+    required this.debates,
+    required this.avgScore,
+    required this.wins,
+    required this.editMode,
+    required this.nameCtrl,
+    required this.bioCtrl,
+    required this.saving,
+    required this.onSave,
+    required this.onCancel,
+    required this.onEdit,
+    required this.onChangePassword,
+    required this.onSignOut,
+  });
+
+  String _rankLine() {
+    final name = (RankModel.rankData[rank]!['name'] as String).toUpperCase();
+    final ranks = DebateRank.values;
+    final idx = ranks.indexOf(rank);
+    final String next;
+    if (idx >= ranks.length - 1) {
+      next = 'Top rank reached';
+    } else {
+      final data = RankModel.rankData[ranks[idx + 1]]!;
+      final remaining = (data['minPoints'] as int) - points;
+      next = '$remaining to ${data['name']}';
+    }
+    return '$name · $points pts · $next';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+
+    return StaggeredColumn(
+      children: [
+        Center(
+          child: UserAvatar(
+            seed: avatarSeed ?? 'Debater',
+            size: 88,
+            ringColor: rankColor,
+            onTap: onTapAvatar,
+            semanticLabel: 'Change avatar',
+          ),
+        ),
+        AppSpacing.vLg,
+        Text(
+          displayName,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.headlineSmall,
+        ),
+        if (email.isNotEmpty) ...[
+          AppSpacing.vXs,
+          Text(
+            email,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodySmall,
+          ),
+        ],
+        if (bio.isNotEmpty) ...[
+          AppSpacing.vMd,
+          Text(
+            bio,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+          ),
+        ],
+        AppSpacing.vLg,
+        Text(
+          _rankLine(),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.labelSmall?.copyWith(
+            color: c.rankText,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        AppSpacing.vSm,
+        AppProgressBar(
+          value: RankModel.getRankProgress(points),
+          height: 4,
+          color: rankColor,
+        ),
+        AppSpacing.vXxl,
+        Row(
+          children: [
+            Expanded(child: _Number(value: debates, caption: 'Debates')),
+            Expanded(child: _Number(value: avgScore, caption: 'Avg score')),
+            Expanded(child: _Number(value: wins, caption: 'Wins')),
+          ],
+        ),
+        if (editMode) ...[
+          const AppSectionLabel('Edit profile'),
+          AppTextField(
+            label: 'Display name',
+            hint: 'Your name',
+            controller: nameCtrl,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            enabled: !saving,
+          ),
+          AppSpacing.vLg,
+          AppTextField(
+            label: 'Bio',
+            hint: 'Write something about yourself',
+            controller: bioCtrl,
+            minLines: 3,
+            maxLines: 5,
+            textCapitalization: TextCapitalization.sentences,
+            enabled: !saving,
+          ),
+          AppSpacing.vXl,
+          Row(
+            children: [
+              Expanded(
+                child: AppButton.primary(
+                  label: 'Save',
+                  loading: saving,
+                  onPressed: onSave,
+                ),
+              ),
+              AppSpacing.hMd,
+              AppButton.ghost(
+                label: 'Cancel',
+                onPressed: saving ? null : onCancel,
+              ),
+            ],
+          ),
+        ] else ...[
+          const AppSectionLabel('Account'),
+          AppRows(
+            children: [
+              AppPlainRow(
+                title: 'Edit profile',
+                subtitle: 'Display name and bio',
+                chevron: true,
+                onTap: onEdit,
+              ),
+              AppPlainRow(
+                title: 'Change password',
+                chevron: true,
+                onTap: onChangePassword,
+              ),
+              AppPlainRow(
+                title: 'Sign out',
+                titleColor: c.negativeText,
+                onTap: onSignOut,
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A mono number over a small-caps caption. No card.
+class _Number extends StatelessWidget {
+  final int value;
+  final String caption;
+
+  const _Number({required this.value, required this.caption});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AnimatedNumber(value: value, size: 22),
+        AppSpacing.vXs,
+        AppOverline(caption),
+      ],
+    );
+  }
+}
+
+/// Loading placeholder shaped like the phone composition.
+class _PhoneProfileSkeleton extends StatelessWidget {
+  const _PhoneProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row() => const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: AppSkeleton.line(width: 150, height: 14),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Center(child: AppSkeleton.circle(size: 88)),
+        AppSpacing.vLg,
+        const Center(child: AppSkeleton.line(width: 160, height: 22)),
+        AppSpacing.vSm,
+        const Center(child: AppSkeleton.line(width: 200, height: 12)),
+        AppSpacing.vLg,
+        const Center(child: AppSkeleton.line(width: 220, height: 11)),
+        AppSpacing.vSm,
+        const AppSkeleton.line(height: 4),
+        AppSpacing.vXxl,
+        Row(
+          children: [
+            for (var i = 0; i < 3; i++)
+              Expanded(
+                child: Column(
+                  children: const [
+                    AppSkeleton.line(width: 40, height: 22),
+                    SizedBox(height: AppSpacing.xs),
+                    AppSkeleton.line(width: 56, height: 11),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        AppSpacing.vXxxl,
+        const AppSkeleton.line(width: 72, height: 11),
+        AppSpacing.vSm,
+        row(),
+        row(),
+        row(),
+      ],
     );
   }
 }

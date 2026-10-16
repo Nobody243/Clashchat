@@ -1,18 +1,28 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../models/debate_mode.dart';
 import '../models/debate_record.dart';
 import '../ui/ui.dart';
 
-/// One row of the history list. Lives inside an [AppListGroup]; it draws no
-/// border or background of its own except the hover tint (pointer devices)
-/// and the accent hairline when [selected] in a master–detail layout.
+/// One row of the history list.
+///
+/// Wide layouts: lives inside an [AppListGroup]; draws no border or
+/// background of its own except the hover tint (pointer devices) and the
+/// accent hairline when [selected] in a master–detail layout.
+///
+/// Phones ([compact] = true, DESIGN.md §10): an [AppPlainRow] led by the mono
+/// score coloured by band, "Stance · Mode" underneath, the time on the right.
+/// No ring, no pills, no chevron.
 class HistoryDebateCard extends StatelessWidget {
   final DebateRecord record;
   final VoidCallback onTap;
 
   /// Marks the row shown in the detail pane (accent hairline + soft tint).
   final bool selected;
+
+  /// Phone composition: plain hairline row instead of the ring + pills row.
+  final bool compact;
 
   /// Retained for source compatibility with existing call sites.
   final String? difficulty;
@@ -24,18 +34,22 @@ class HistoryDebateCard extends StatelessWidget {
     required this.record,
     required this.onTap,
     this.selected = false,
+    this.compact = false,
     this.difficulty,
     this.summary,
     this.messageCount,
   });
 
-  /// Score band: 70+ positive, 40–69 warning, below 40 negative.
-  static Color scoreColor(BuildContext context, int score) {
-    final c = context.colors;
-    if (score >= 70) return c.positiveText;
-    if (score >= 40) return c.warningText;
-    return c.negativeText;
-  }
+  /// Score band colour: 70+ positive, 40–69 warning, below 40 negative.
+  static Color scoreColor(BuildContext context, int score) =>
+      scoreBand(score).color(context);
+
+  /// Display name of a mode, shared with the history tabs.
+  static String modeLabel(DebateMode mode) => switch (mode) {
+        DebateMode.ranked => 'Ranked',
+        DebateMode.casual => 'Casual',
+        DebateMode.learning => 'Learning',
+      };
 
   String _formatDate() {
     final now = DateTime.now();
@@ -53,6 +67,8 @@ class HistoryDebateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return _buildCompact(context);
+
     final c = context.colors;
     final showPoints = record.isRanked && record.pointsEarned != 0;
     final pointsPositive = record.pointsEarned > 0;
@@ -141,6 +157,25 @@ class HistoryDebateCard extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  /// Phone row: mono score · topic / "Stance · Mode (+pts)" · time.
+  Widget _buildCompact(BuildContext context) {
+    final c = context.colors;
+    final points = record.isRanked && record.pointsEarned > 0
+        ? '  +${record.pointsEarned}'
+        : '';
+    return AppPlainRow(
+      leading: ScoreNumber(record.score),
+      title: record.topic,
+      subtitle: '${record.stance} · ${modeLabel(record.mode)}$points',
+      trailing: Text(
+        DateFormat.jm().format(record.date),
+        style: context.mono(size: 11, weight: FontWeight.w500, color: c.textHint),
+      ),
+      chevron: false,
+      onTap: onTap,
     );
   }
 }

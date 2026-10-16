@@ -540,10 +540,76 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  static String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).toLowerCase();
+
+  /// Phone header (DESIGN.md §10): back, "topic · stance" over
+  /// "mode · difficulty", the bare timer arc, and a quiet End link. No pills.
+  Widget _buildCompactHeader(BuildContext context) {
+    final c = context.colors;
     final text = context.text;
     final topInset = MediaQuery.paddingOf(context).top;
-    final gutter = context.isCompact ? AppSpacing.gutter : AppSpacing.xxl;
+
+    return GlassBar(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.gutter - AppSpacing.sm,
+        topInset + AppSpacing.xs,
+        AppSpacing.gutter - AppSpacing.sm,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          AppIconButton(
+            icon: AppIcons.back,
+            iconSize: 24,
+            tooltip: 'End debate',
+            onPressed: () => _showExitDialog(context),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${widget.topic} · ${_capitalize(widget.stance)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  '${_capitalize(widget.mode.name)} · ${_capitalize(widget.difficulty)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.labelSmall?.copyWith(color: c.textHint),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          if (widget.timerMinutes != null) ...[
+            DebateTimerWidget(
+              timerService: _timerService,
+              totalSeconds: widget.timerMinutes! * 60,
+              onTap: _toggleTimer,
+              compact: true,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          _EndLink(onTap: _isEnding ? null : () => _showExitDialog(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    if (context.isCompact) return _buildCompactHeader(context);
+
+    final text = context.text;
+    final topInset = MediaQuery.paddingOf(context).top;
+    final gutter = AppSpacing.xxl;
 
     return GlassBar(
       padding: EdgeInsets.fromLTRB(
@@ -634,6 +700,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageList({required EdgeInsets padding}) {
     final showAvatars = context.isWide;
+    final compact = context.isCompact;
     return ListView.builder(
       controller: _scrollCtrl,
       padding: padding,
@@ -655,6 +722,7 @@ class _ChatScreenState extends State<ChatScreen> {
           message: message,
           isGrouped: prevMsg?.isUser == message.isUser,
           isLastInGroup: isLast,
+          compact: compact,
           reserveLeading: showAvatars,
           leading: showAvatars && isLast
               ? (message.isUser ? _userAvatar() : _aiAvatar())
@@ -822,7 +890,9 @@ class _SizeReporterState extends State<_SizeReporter> {
 // Scoring overlay (shown while AiService.scoreDebate runs)
 // ══════════════════════════════════════════════════════════
 class _ScoringOverlay extends StatefulWidget {
-  const _ScoringOverlay({this.title = 'Scoring your debate'});
+  const _ScoringOverlay({this.title = defaultTitle});
+
+  static const String defaultTitle = 'Scoring your debate';
 
   final String title;
 
@@ -869,14 +939,37 @@ class _ScoringOverlayState extends State<_ScoringOverlay> {
           child: StaggeredColumn(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const AppSkeleton.circle(size: 120),
-              const SizedBox(height: AppSpacing.xxl),
-              Text(
-                widget.title,
-                textAlign: TextAlign.center,
-                style: text.titleMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
+              if (context.isCompact) ...[
+                // Phone: the word is the design (DESIGN.md §10), no loader
+                // chrome. A non-default title ("Time's up") sits above it.
+                if (widget.title != _ScoringOverlay.defaultTitle) ...[
+                  Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: text.labelSmall?.copyWith(
+                      color: c.textHint,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+                Text(
+                  'Scoring',
+                  textAlign: TextAlign.center,
+                  style: text.displaySmall,
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ] else ...[
+                const AppSkeleton.circle(size: 120),
+                const SizedBox(height: AppSpacing.xxl),
+                Text(
+                  widget.title,
+                  textAlign: TextAlign.center,
+                  style: text.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
               AnimatedSwitcher(
                 duration: kRevealDuration,
                 switchInCurve: Curves.easeOutCubic,
@@ -901,6 +994,40 @@ class _ScoringOverlayState extends State<_ScoringOverlay> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// End link: a ghost text action in the negative colour for the phone
+// header (AppButton.ghost is fixed to the accent colour). 40 px tall, so it
+// matches a small AppButton and stays a comfortable target.
+// ══════════════════════════════════════════════════════════
+class _EndLink extends StatelessWidget {
+  const _EndLink({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final enabled = onTap != null;
+    return Pressable(
+      onTap: onTap,
+      enabled: enabled,
+      pressedScale: 0.96,
+      semanticLabel: 'End debate',
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        alignment: Alignment.center,
+        child: Text(
+          'End',
+          style: context.text.labelLarge?.copyWith(
+            color: enabled ? c.negativeText : c.textHint,
           ),
         ),
       ),

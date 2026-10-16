@@ -24,12 +24,81 @@ class SettingsScreen extends StatelessWidget {
     // The appearance control is the one place that reads the theme choice.
     final themeMode = context.watch<ThemeProvider>().themeMode;
 
+    final segmented = AppSegmented(
+      labels: const ['System', 'Light', 'Dark'],
+      icons: const [AppIcons.sparkle, AppIcons.sun, AppIcons.moon],
+      index: _modes.indexOf(themeMode),
+      onChanged: (i) => context.read<ThemeProvider>().setMode(_modes[i]),
+    );
+
+    if (compact) {
+      // Phone composition (DESIGN.md §10): type and hairlines, no cards.
+      final soon = Text(
+        'Coming soon',
+        style: context.text.labelSmall?.copyWith(color: c.textHint),
+      );
+      return AppPage(
+        width: AppPageWidth.form,
+        bottomSafe: false,
+        padding: EdgeInsets.fromLTRB(
+          gutter,
+          AppSpacing.xl,
+          gutter,
+          AppSpacing.xxxl + bottomInset,
+        ),
+        child: StaggeredColumn(
+          children: [
+            Text('Settings', style: context.text.headlineMedium),
+            const AppSectionLabel('Appearance'),
+            segmented,
+            const AppSectionLabel('Preferences'),
+            AppRows(
+              children: [
+                AppPlainRow(
+                  title: 'Notifications',
+                  subtitle: 'Reminders when your daily quota resets',
+                  trailing: soon,
+                ),
+                AppPlainRow(
+                  title: 'Sound effects',
+                  subtitle: 'Timer and result cues',
+                  trailing: soon,
+                ),
+              ],
+            ),
+            const AppSectionLabel('About'),
+            AppRows(
+              children: [
+                AppPlainRow(
+                  title: 'Version',
+                  trailing: Text(
+                    _version,
+                    style: context.mono(size: 12, color: c.textSecondary),
+                  ),
+                ),
+                AppPlainRow(
+                  title: 'Privacy policy',
+                  chevron: true,
+                  onTap: () {},
+                ),
+                AppPlainRow(
+                  title: 'Terms of service',
+                  chevron: true,
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return AppPage(
       width: AppPageWidth.content,
       bottomSafe: false,
       padding: EdgeInsets.fromLTRB(
         gutter,
-        compact ? AppSpacing.xl : AppSpacing.xxl,
+        AppSpacing.xxl,
         gutter,
         AppSpacing.xxxl + bottomInset,
       ),
@@ -49,13 +118,7 @@ class SettingsScreen extends StatelessWidget {
                   style: context.text.bodySmall,
                 ),
                 AppSpacing.vLg,
-                AppSegmented(
-                  labels: const ['System', 'Light', 'Dark'],
-                  icons: const [AppIcons.sparkle, AppIcons.sun, AppIcons.moon],
-                  index: _modes.indexOf(themeMode),
-                  onChanged: (i) =>
-                      context.read<ThemeProvider>().setMode(_modes[i]),
-                ),
+                segmented,
               ],
             ),
           ),

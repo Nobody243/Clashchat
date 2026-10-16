@@ -118,6 +118,21 @@ The first pass set tokens and structure. This layer is what makes it feel made.
 - **Bento** (`Bento`): dashboards are mosaics on wide screens (rank hero 2×, usage 1×, modes, recent debates) and a single priority-ordered column on phones. Rows are intrinsic-height so tiles align.
 - **Mobile is primary**: safe areas everywhere, keyboard-aware composers, 44 px targets, bottom sheets with drag handles, blurred bottom nav, pull-to-refresh on lists. Desktop adds, never replaces.
 
+## 10. Phone Composition (v3)
+
+The phone is not a narrow desktop. Below 600 px every screen follows these rules; the web keeps its sidebar and bento.
+
+- **No card stacks.** Lists are `AppRows` of `AppPlainRow`s separated by hairlines, with no container. A card appears only where elevation means something: the two side buttons on Home, the composer, a selected option.
+- **No icon tiles.** Rows lead with a mono number (score, count) or nothing. Icons are reserved for navigation and the few actions that need them.
+- **One action per screen.** Home: pick a side. Setup: start. Chat: send. Results: debate again. Everything else is quiet text.
+- **Type carries hierarchy.** `AppSectionLabel` small caps for sections, `headlineMedium` for the motion, `context.mono` 96 px for the final score, `AppTextTabs` underlined text for mode/filter tabs. No pills in headers.
+- **Home hero = today's motion** (`Motions.forDay()`), with a split For / Against choice that starts the flow in the selected mode; "Or write your own motion" opens the topic screen. A quiet top line holds avatar, rank and today's quota.
+- **Setup is one screen** after the side is chosen: step bar, mode · stance eyebrow, the motion, opponent rows with radio marks, clock chips, CTA.
+- **Chat**: header is topic · stance over mode · difficulty with the timer arc; AI messages are left-ruled text blocks labelled CLASHBOT, your messages are flame bubbles.
+- **Results**: the score is the design: 96 px mono numeral, band label (`ScoreBand`), one-line verdict, a hairline meta row, feedback as left-ruled paragraphs under small-caps headings.
+- **History**: title + Filter link, a row of three numbers, text tabs (All · Casual · Ranked · Learning), rows grouped by day with a mono score coloured by band.
+- **Profile / Settings**: large avatar, name, rank line, one row of three numbers, plain action rows.
+
 ## 8. Anti-Patterns (Banned)
 
 - Emoji anywhere in UI.

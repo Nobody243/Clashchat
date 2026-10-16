@@ -23,9 +23,9 @@ class DifficultyScreen extends StatefulWidget {
 
 class _DifficultyScreenState extends State<DifficultyScreen> {
   static const List<({String value, String desc})> _difficulties = [
-    (value: 'easy', desc: 'Simple language, makes logical slips'),
-    (value: 'medium', desc: 'Clear logic and fair arguments'),
-    (value: 'hard', desc: 'Advanced reasoning, sharp rebuttals'),
+    (value: 'easy', desc: 'Gentle, everyday examples.'),
+    (value: 'medium', desc: 'Evidence-driven, pushes back.'),
+    (value: 'hard', desc: 'Dissects your premises. No mercy.'),
   ];
 
   String _difficulty = 'medium';
@@ -48,6 +48,16 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
     );
   }
 
+  List<Widget> get _rows => [
+        for (final d in _difficulties)
+          SetupDifficultyRow(
+            name: d.value,
+            description: d.desc,
+            selected: _difficulty == d.value,
+            onTap: () => _select(d.value),
+          ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     return SetupScaffold(
@@ -64,23 +74,27 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
         icon: AppIcons.play,
         onPressed: () => _selectDifficulty(_difficulty),
       ),
+      compactChildren: [
+        AppSectionLabel(
+          '${DebateMode.casual.setupLabel} · ${widget.stance}',
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        ),
+        Text(
+          widget.topic,
+          style: context.text.titleLarge,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const AppSectionLabel('Opponent'),
+        AppRows(children: _rows),
+      ],
       children: [
         _SummaryCard(topic: widget.topic, stance: widget.stance),
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const AppSectionHeader(title: 'Opponent strength'),
-            AppListGroup(
-              children: [
-                for (final d in _difficulties)
-                  SetupDifficultyRow(
-                    name: d.value,
-                    description: d.desc,
-                    selected: _difficulty == d.value,
-                    onTap: () => _select(d.value),
-                  ),
-              ],
-            ),
+            AppListGroup(children: _rows),
           ],
         ),
       ],
@@ -88,7 +102,7 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
   }
 }
 
-/// Topic and stance recap.
+/// Topic and stance recap (wide layouts).
 class _SummaryCard extends StatelessWidget {
   final String topic;
   final String stance;

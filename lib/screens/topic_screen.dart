@@ -102,25 +102,14 @@ class _TopicScreenState extends State<TopicScreen> {
         trailingIcon: AppIcons.forward,
         onPressed: _canContinue ? _nextStep : null,
       ),
+      compactChildren: _phoneBlocks(context),
       children: [
         _buildGrid(columns),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const AppSectionHeader(title: 'Or write your own'),
-            AppTextField(
-              controller: _customTopicCtrl,
-              hint: 'e.g. Remote work makes teams more productive',
-              prefixIcon: AppIcons.topic,
-              minLines: 1,
-              maxLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.done,
-              onChanged: (_) => setState(() => _selectedCategory = null),
-              onSubmitted: (_) {
-                if (_canContinue) _nextStep();
-              },
-            ),
+            _customField(hint: 'e.g. Remote work makes teams more productive'),
             const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.only(left: AppSpacing.xs),
@@ -132,6 +121,59 @@ class _TopicScreenState extends State<TopicScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  /// Phone composition (DESIGN.md §10): eyebrow, question, hint, the eight
+  /// categories as plain hairline rows with a trailing check, then the
+  /// free-text field. No cards, no icon tiles.
+  List<Widget> _phoneBlocks(BuildContext context) {
+    final c = context.colors;
+    return [
+      AppSectionLabel(
+        widget.mode.setupLabel,
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      ),
+      Text("What's the motion?", style: context.text.headlineMedium),
+      const SizedBox(height: AppSpacing.sm),
+      Text(
+        'Pick a category or write your own.',
+        style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+      ),
+      const SizedBox(height: AppSpacing.xxl),
+      AppRows(
+        children: [
+          for (final cat in _categories)
+            AppPlainRow(
+              title: cat.label,
+              titleColor: _selectedCategory == cat.label
+                  ? c.textPrimary
+                  : c.textSecondary,
+              trailing: _selectedCategory == cat.label
+                  ? Icon(AppIcons.check, size: 20, color: c.accent)
+                  : null,
+              onTap: () => _toggleCategory(cat.label),
+            ),
+        ],
+      ),
+      const AppSectionLabel('Or write your own'),
+      _customField(hint: 'A short, debatable, specific claim'),
+    ];
+  }
+
+  Widget _customField({required String hint}) {
+    return AppTextField(
+      controller: _customTopicCtrl,
+      hint: hint,
+      prefixIcon: context.isCompact ? null : AppIcons.topic,
+      minLines: 1,
+      maxLines: 2,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: TextInputAction.done,
+      onChanged: (_) => setState(() => _selectedCategory = null),
+      onSubmitted: (_) {
+        if (_canContinue) _nextStep();
+      },
     );
   }
 
@@ -160,8 +202,8 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 }
 
-/// One category: icon tile top-left, label bottom-left. Selected cards get
-/// the accent hairline from [AppCard] and tint their tile.
+/// One category (wide layouts): icon tile top-left, label bottom-left.
+/// Selected cards get the accent hairline from [AppCard] and tint their tile.
 class _CategoryCard extends StatelessWidget {
   final String label;
   final IconData icon;

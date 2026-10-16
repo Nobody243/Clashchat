@@ -286,7 +286,10 @@ class _BottomNavItem extends StatelessWidget {
             AppSpacing.vXs,
             AnimatedDefaultTextStyle(
               duration: AppDurations.fast,
-              style: context.text.labelMedium!.copyWith(color: fg),
+              style: context.text.labelSmall!.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w600,
+              ),
               child: Text(destination.label, maxLines: 1),
             ),
           ],

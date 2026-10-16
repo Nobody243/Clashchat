@@ -5,13 +5,17 @@ import 'package:intl/intl.dart';
 import '../core/responsive_layout.dart';
 import '../models/debate_mode.dart';
 import '../models/debate_record.dart';
+import '../models/motions.dart';
 import '../models/rank_model.dart';
 import '../services/auth_service.dart';
 import '../services/usage_quota_service.dart';
 import '../ui/ui.dart';
 import '../widgets/user_avatar.dart';
+import 'chat_screen.dart';
+import 'debate_setup_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import 'ranked_setup_screen.dart';
 import 'results_screen.dart';
 import 'settings_screen.dart';
 import 'topic_screen.dart';
@@ -72,6 +76,9 @@ class _HomeBody extends StatefulWidget {
 }
 
 class _HomeBodyState extends State<_HomeBody> {
+  /// Phone only: the mode the hero's For / Against buttons start in.
+  DebateMode _mode = DebateMode.casual;
+
   static String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
@@ -84,6 +91,27 @@ class _HomeBodyState extends State<_HomeBody> {
       context,
       MaterialPageRoute(builder: (_) => TopicScreen(mode: mode)),
     );
+  }
+
+  /// Phone hero: start today's motion on [stance] in the selected mode.
+  /// Mirrors StanceScreen's next step for each mode (the quota itself is
+  /// consumed by ChatScreen when the first message is sent).
+  void _startSide(String stance) {
+    final topic = Motions.forDay();
+    final mode = _mode;
+    final Widget next = switch (mode) {
+      DebateMode.learning => ChatScreen(
+          topic: topic,
+          stance: stance,
+          difficulty: 'Adaptable', // Default for Learning Mode
+          timerMinutes: null, // No timer for learning
+          mode: mode,
+        ),
+      DebateMode.ranked => RankedSetupScreen(topic: topic, stance: stance),
+      DebateMode.casual =>
+        DebateSetupScreen(topic: topic, stance: stance, mode: mode),
+    };
+    Navigator.push(context, MaterialPageRoute(builder: (_) => next));
   }
 
   void _openRecord(DebateRecord record) {
@@ -134,7 +162,7 @@ class _HomeBodyState extends State<_HomeBody> {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     Widget page = AppPage(
-      width: AppPageWidth.wide,
+      width: compact ? AppPageWidth.form : AppPageWidth.wide,
       bottomSafe: false,
       padding: EdgeInsets.fromLTRB(
         gutter,
@@ -149,7 +177,9 @@ class _HomeBodyState extends State<_HomeBody> {
           final loading =
               snapshot.connectionState == ConnectionState.waiting &&
                   !snapshot.hasData;
-          if (loading) return const _DashboardSkeleton();
+          if (loading) {
+            return compact ? const _PhoneSkeleton() : const _DashboardSkeleton();
+          }
 
           final data = snapshot.data?.data() as Map<String, dynamic>?;
           final displayName = data?['displayName'] as String? ??
@@ -175,6 +205,25 @@ class _HomeBodyState extends State<_HomeBody> {
               final recent = (recentSnap.data?.docs ?? const [])
                   .map(DebateRecord.fromFirestore)
                   .toList(growable: false);
+
+              if (compact) {
+                return _PhoneHome(
+                  displayName: displayName,
+                  avatarSeed: avatarSeed,
+                  rank: rank,
+                  rankColor: rankColor,
+                  points: points,
+                  quota: quota,
+                  recent: recent,
+                  mode: _mode,
+                  onModeChanged: (m) => setState(() => _mode = m),
+                  onPickSide: _startSide,
+                  onWriteOwn: () => _open(_mode),
+                  onOpenRecord: _openRecord,
+                  onTapAvatar: () => widget.onNavigate(2),
+                  onSeeAll: () => widget.onNavigate(1),
+                );
+              }
 
               return StaggeredColumn(
                 children: [
@@ -222,6 +271,419 @@ class _HomeBodyState extends State<_HomeBody> {
     }
 
     return page;
+  }
+}
+
+// ── Phone composition (DESIGN.md §10) ────────────────────────────────────────
+
+/// Phones: a quiet top line, today's motion as the hero with a split
+/// For / Against choice, text tabs for the mode, and recent debates as plain
+/// rows. No cards, no icon tiles, one action.
+class _PhoneHome extends StatelessWidget {
+  final String displayName;
+  final String avatarSeed;
+  final DebateRank rank;
+  final Color rankColor;
+  final int points;
+  final UsageQuotaState quota;
+  final List<DebateRecord> recent;
+  final DebateMode mode;
+  final ValueChanged<DebateMode> onModeChanged;
+  final ValueChanged<String> onPickSide;
+  final VoidCallback onWriteOwn;
+  final ValueChanged<DebateRecord> onOpenRecord;
+  final VoidCallback onTapAvatar;
+  final VoidCallback onSeeAll;
+
+  const _PhoneHome({
+    required this.displayName,
+    required this.avatarSeed,
+    required this.rank,
+    required this.rankColor,
+    required this.points,
+    required this.quota,
+    required this.recent,
+    required this.mode,
+    required this.onModeChanged,
+    required this.onPickSide,
+    required this.onWriteOwn,
+    required this.onOpenRecord,
+    required this.onTapAvatar,
+    required this.onSeeAll,
+  });
+
+  static String _describe(DebateMode mode) => switch (mode) {
+        DebateMode.casual =>
+          "Custom timer, pick the opponent's strength. Nothing at stake.",
+        DebateMode.ranked =>
+          'Timed match, opponent set by your rank. Points on the line.',
+        DebateMode.learning =>
+          'Untimed. A coaching tip after every message you send.',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final locked = quota.isLocked;
+
+    return StaggeredColumn(
+      children: [
+        _TopLine(
+          displayName: displayName,
+          avatarSeed: avatarSeed,
+          rank: rank,
+          rankColor: rankColor,
+          points: points,
+          quota: quota,
+          onTapAvatar: onTapAvatar,
+        ),
+        AppSpacing.vXxxl,
+        const AppSectionLabel(
+          "Today's motion",
+          padding: EdgeInsets.only(bottom: AppSpacing.sm),
+        ),
+        Text(
+          Motions.forDay(),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.headlineMedium?.copyWith(height: 1.12),
+        ),
+        AppSpacing.vMd,
+        Text(
+          'Pick a side. ClashBot takes the other.',
+          style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+        ),
+        AppSpacing.vXl,
+        Row(
+          children: [
+            Expanded(
+              child: _SideButton(
+                label: 'For',
+                caption: 'I agree',
+                color: c.positiveText,
+                enabled: !locked,
+                onTap: () => onPickSide('For'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SideButton(
+                label: 'Against',
+                caption: 'I disagree',
+                color: c.negativeText,
+                enabled: !locked,
+                onTap: () => onPickSide('Against'),
+              ),
+            ),
+          ],
+        ),
+        if (locked) ...[
+          AppSpacing.vSm,
+          Text(
+            'Daily limit reached',
+            textAlign: TextAlign.center,
+            style: context.text.labelSmall?.copyWith(color: c.textHint),
+          ),
+        ],
+        AppSpacing.vLg,
+        Pressable(
+          onTap: onWriteOwn,
+          pressedScale: 0.98,
+          semanticLabel: 'Write your own motion',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Text(
+              'Or write your own motion →',
+              style: context.text.labelLarge?.copyWith(color: c.accent),
+            ),
+          ),
+        ),
+        AppSpacing.vXxxl,
+        AppTextTabs(
+          labels: const ['Casual', 'Ranked', 'Learning'],
+          index: DebateMode.values.indexOf(mode),
+          onChanged: (i) => onModeChanged(DebateMode.values[i]),
+        ),
+        AppSpacing.vMd,
+        Text(
+          _describe(mode),
+          style: context.text.bodySmall?.copyWith(color: c.textSecondary),
+        ),
+        if (recent.isNotEmpty) ...[
+          AppSectionLabel(
+            'Recent',
+            actionLabel: 'See all',
+            onAction: onSeeAll,
+          ),
+          AppRows(
+            children: [
+              for (final r in recent.take(3))
+                AppPlainRow(
+                  title: r.topic,
+                  subtitle: _recentSubtitle(r),
+                  leading: ScoreNumber(r.score),
+                  trailing: Text(
+                    _when(r.date),
+                    style: context.mono(size: 11, color: c.textHint),
+                  ),
+                  onTap: () => onOpenRecord(r),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  static String _modeName(DebateMode mode) => switch (mode) {
+        DebateMode.casual => 'Casual',
+        DebateMode.ranked => 'Ranked',
+        DebateMode.learning => 'Learning',
+      };
+
+  static String _recentSubtitle(DebateRecord r) {
+    final base = '${r.stance} · ${_modeName(r.mode)}';
+    if (r.mode == DebateMode.ranked && r.pointsEarned > 0) {
+      return '$base +${r.pointsEarned}';
+    }
+    return base;
+  }
+
+  /// "Today 9:52" / "Yesterday" / "Mon" (older than a week: "Mar 4").
+  static String _when(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final days = today.difference(day).inDays;
+    if (days <= 0) return 'Today ${DateFormat('H:mm').format(date)}';
+    if (days == 1) return 'Yesterday';
+    if (days < 7) return DateFormat.E().format(date);
+    return DateFormat('MMM d').format(date);
+  }
+}
+
+/// Avatar + name + rank line on the left, today's quota on the right.
+class _TopLine extends StatelessWidget {
+  final String displayName;
+  final String avatarSeed;
+  final DebateRank rank;
+  final Color rankColor;
+  final int points;
+  final UsageQuotaState quota;
+  final VoidCallback onTapAvatar;
+
+  const _TopLine({
+    required this.displayName,
+    required this.avatarSeed,
+    required this.rank,
+    required this.rankColor,
+    required this.points,
+    required this.quota,
+    required this.onTapAvatar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final rankName =
+        (RankModel.rankData[rank]!['name'] as String).toUpperCase();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        UserAvatar(
+          seed: avatarSeed,
+          size: 34,
+          ringColor: rankColor,
+          ringWidth: 2,
+          onTap: onTapAvatar,
+          semanticLabel: 'Profile',
+        ),
+        AppSpacing.hMd,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.labelLarge,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                '$rankName · $points pts',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.labelSmall?.copyWith(
+                  color: c.rankText,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        AppSpacing.hMd,
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${quota.usedToday}',
+                style: context.mono(size: 11, color: c.textSecondary),
+              ),
+              TextSpan(
+                text: '/${quota.dailyLimit} today',
+                style: context.text.labelSmall?.copyWith(color: c.textHint),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One of the two 64 px side buttons: the only raised surface on the phone
+/// Home, because this is the screen's one action.
+class _SideButton extends StatelessWidget {
+  final String label;
+  final String caption;
+  final Color color;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _SideButton({
+    required this.label,
+    required this.caption,
+    required this.color,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final fg = enabled ? color : c.textHint;
+
+    return Pressable(
+      onTap: enabled ? onTap : null,
+      enabled: enabled,
+      pressedScale: 0.96,
+      semanticLabel: '$label: $caption',
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.borderStrong),
+        ),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: context.text.titleSmall?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              caption,
+              style: context.text.labelSmall?.copyWith(color: c.textHint),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Loading placeholder shaped like the phone composition: top line, hero,
+/// two side buttons and three rows.
+class _PhoneSkeleton extends StatelessWidget {
+  const _PhoneSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row() => Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Row(
+            children: [
+              const AppSkeleton.line(width: 28, height: 14),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    AppSkeleton.line(width: 200, height: 14),
+                    SizedBox(height: AppSpacing.sm),
+                    AppSkeleton.line(width: 110, height: 11),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              const AppSkeleton.line(width: 52, height: 11),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const AppSkeleton.circle(size: 34),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  AppSkeleton.line(width: 120, height: 14),
+                  SizedBox(height: AppSpacing.xs),
+                  AppSkeleton.line(width: 90, height: 11),
+                ],
+              ),
+            ),
+            const AppSkeleton.line(width: 64, height: 11),
+          ],
+        ),
+        AppSpacing.vXxxl,
+        const AppSkeleton.line(width: 96, height: 11),
+        AppSpacing.vMd,
+        const AppSkeleton.line(height: 28),
+        AppSpacing.vSm,
+        const AppSkeleton.line(width: 220, height: 28),
+        AppSpacing.vMd,
+        const AppSkeleton.line(width: 200, height: 14),
+        AppSpacing.vXl,
+        Row(
+          children: [
+            Expanded(
+              child: AppSkeleton.block(
+                height: 64,
+                radius: BorderRadius.circular(16),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AppSkeleton.block(
+                height: 64,
+                radius: BorderRadius.circular(16),
+              ),
+            ),
+          ],
+        ),
+        AppSpacing.vXxxl,
+        const AppSkeleton.line(width: 220, height: 14),
+        AppSpacing.vXxl,
+        row(),
+        row(),
+        row(),
+      ],
+    );
   }
 }
 

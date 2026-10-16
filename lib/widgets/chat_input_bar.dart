@@ -196,6 +196,8 @@ class _PromptRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final compact = context.isCompact;
     return SizedBox(
       height: 28,
       child: ScrollConfiguration(
@@ -207,19 +209,38 @@ class _PromptRow extends StatelessWidget {
           separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
           itemBuilder: (context, i) {
             final p = prompts[i];
+            // Phone (DESIGN.md §10): a quiet 1 px outline and muted label,
+            // no icon. Wide keeps the neutral sparkle pill.
+            final Widget chip = compact
+                ? Container(
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadius.pillAll,
+                      border: Border.all(color: c.borderStrong),
+                    ),
+                    child: Text(
+                      p,
+                      maxLines: 1,
+                      style: context.text.labelMedium?.copyWith(
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  )
+                : AppPill(
+                    label: p,
+                    icon: AppIcons.sparkle,
+                    tone: AppPillTone.neutral,
+                  );
             return Pressable(
               enabled: enabled,
               onTap: enabled ? () => onTap(p) : null,
               pressedScale: 0.95,
               semanticLabel: p,
-              child: Opacity(
-                opacity: enabled ? 1 : 0.6,
-                child: AppPill(
-                  label: p,
-                  icon: AppIcons.sparkle,
-                  tone: AppPillTone.neutral,
-                ),
-              ),
+              child: Opacity(opacity: enabled ? 1 : 0.6, child: chip),
             );
           },
         ),

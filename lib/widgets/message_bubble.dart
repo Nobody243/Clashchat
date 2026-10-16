@@ -4,14 +4,20 @@ import 'package:intl/intl.dart';
 import '../models/chat_message.dart';
 import '../ui/ui.dart';
 
-/// One debate message. User turns are an accent fill; AI turns are a raised
-/// surface with a hairline. A coach tip (learning mode) renders as its own
-/// raised card directly under the AI bubble.
+/// One debate message.
 ///
-/// On wide layouts the screen passes a 28 px [leading] avatar for the last
-/// bubble of a sender run and sets [reserveLeading] on every bubble so the
-/// run stays aligned. New messages enter with a fade, an 8 px rise and a
-/// 0.98 → 1 settle.
+/// Wide layouts (the default): user turns are an accent fill; AI turns are a
+/// raised surface with a hairline. A coach tip (learning mode) renders as its
+/// own raised card directly under the AI bubble. The screen passes a 28 px
+/// [leading] avatar for the last bubble of a sender run and sets
+/// [reserveLeading] on every bubble so the run stays aligned.
+///
+/// Phones ([compact], DESIGN.md §10): AI turns are plain text blocks with a
+/// 2 px left rule and a small-caps CLASHBOT label; user turns are flame
+/// bubbles; a coach tip is a left-ruled block in the info colour labelled
+/// COACH. No avatars, no bubble chrome on the AI side.
+///
+/// New messages enter with a fade, an 8 px rise and a 0.98 → 1 settle.
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
 
@@ -28,14 +34,18 @@ class MessageBubble extends StatelessWidget {
   final double wideMaxWidth;
 
   /// Avatar shown beside the bubble (outer edge). Usually only on the last
-  /// bubble of a run.
+  /// bubble of a run. Ignored when [compact].
   final Widget? leading;
 
-  /// Reserve the avatar column even when [leading] is null.
+  /// Reserve the avatar column even when [leading] is null. Ignored when
+  /// [compact].
   final bool reserveLeading;
 
   /// Play the entrance (fade + rise + settle). Runs once per mount.
   final bool animateIn;
+
+  /// Phone composition: ruled text blocks for the AI, flame bubbles for you.
+  final bool compact;
 
   const MessageBubble({
     super.key,
@@ -47,10 +57,139 @@ class MessageBubble extends StatelessWidget {
     this.leading,
     this.reserveLeading = false,
     this.animateIn = true,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isUser = message.isUser;
+
+    Widget child = Padding(
+      padding: EdgeInsets.only(
+        top: isGrouped ? AppSpacing.xs : (compact ? AppSpacing.lg : AppSpacing.md),
+      ),
+      child: compact ? _buildCompact(context) : _buildWide(context),
+    );
+
+    if (animateIn && !context.reduceMotion) {
+      child = TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.98, end: 1),
+        duration: kRevealDuration,
+        curve: Curves.easeOutCubic,
+        child: child,
+        builder: (context, scale, child) => Transform.scale(
+          scale: scale,
+          alignment:
+              isUser ? Alignment.bottomRight : Alignment.bottomLeft,
+          child: child,
+        ),
+      );
+    }
+
+    return AppReveal(child: child);
+  }
+
+  Widget _timestamp(BuildContext context) => Text(
+        DateFormat('h:mm a').format(message.timestamp),
+        style: context.text.labelSmall?.copyWith(color: context.colors.textHint),
+      );
+
+  // ── Phone ──────────────────────────────────────────────────────────────
+
+  Widget _buildCompact(BuildContext context) {
+    final c = context.colors;
+    final text = context.text;
+
+    if (message.isUser) {
+      final maxWidth = MediaQuery.sizeOf(context).width * 0.86;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color: c.accent,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(5),
+                ),
+              ),
+              child: Text(
+                message.text,
+                style: text.bodyMedium?.copyWith(color: c.onAccent),
+              ),
+            ),
+          ),
+          if (isLastInGroup) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.xs),
+              child: _timestamp(context),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final tip = message.coachTip;
+    final hasTip = tip != null && tip.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isGrouped) ...[
+          _SmallCaps('ClashBot', color: c.textHint),
+          const SizedBox(height: AppSpacing.xs + 2),
+        ],
+        _RuledBlock(
+          color: c.borderStrong,
+          child: Text(
+            message.text,
+            style: text.bodyMedium?.copyWith(color: c.textPrimary),
+          ),
+        ),
+        if (hasTip) ...[
+          const SizedBox(height: AppSpacing.md),
+          _RuledBlock(
+            color: c.infoText,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _SmallCaps('Coach', color: c.infoText),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  tip,
+                  style: text.bodySmall?.copyWith(color: c.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (isLastInGroup) ...[
+          const SizedBox(height: AppSpacing.xs + 2),
+          Padding(
+            // Rule (2) + inset (12) so the stamp sits under the text.
+            padding: const EdgeInsets.only(left: 2 + AppSpacing.md),
+            child: _timestamp(context),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Wide (unchanged composition) ───────────────────────────────────────
+
+  Widget _buildWide(BuildContext context) {
     final c = context.colors;
     final text = context.text;
     final isUser = message.isUser;
@@ -87,7 +226,7 @@ class MessageBubble extends StatelessWidget {
 
     final avatarSlot = SizedBox(width: 28, height: 28, child: leading);
 
-    final body = Column(
+    return Column(
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -132,38 +271,51 @@ class MessageBubble extends StatelessWidget {
               horizontal:
                   AppSpacing.xs + (hasAvatarSlot ? 28 + AppSpacing.sm : 0),
             ),
-            child: Text(
-              DateFormat('h:mm a').format(message.timestamp),
-              style: text.labelSmall?.copyWith(color: c.textHint),
-            ),
+            child: _timestamp(context),
           ),
         ],
       ],
     );
+  }
+}
 
-    Widget child = Padding(
-      padding: EdgeInsets.only(
-        top: isGrouped ? AppSpacing.xs : AppSpacing.md,
+/// Small-caps label ("CLASHBOT", "COACH") in the phone composition.
+class _SmallCaps extends StatelessWidget {
+  const _SmallCaps(this.text, {required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: context.text.labelSmall?.copyWith(
+        color: color,
+        letterSpacing: 1.4,
+        fontWeight: FontWeight.w700,
       ),
-      child: body,
     );
+  }
+}
 
-    if (animateIn && !context.reduceMotion) {
-      child = TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.98, end: 1),
-        duration: kRevealDuration,
-        curve: Curves.easeOutCubic,
-        child: child,
-        builder: (context, scale, child) => Transform.scale(
-          scale: scale,
-          alignment:
-              isUser ? Alignment.bottomRight : Alignment.bottomLeft,
-          child: child,
-        ),
-      );
-    }
+/// Text block with a 2 px left rule and 12 px inset; no background.
+class _RuledBlock extends StatelessWidget {
+  const _RuledBlock({required this.color, required this.child});
 
-    return AppReveal(child: child);
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(left: AppSpacing.md),
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: color, width: 2)),
+      ),
+      child: child,
+    );
   }
 }
 
