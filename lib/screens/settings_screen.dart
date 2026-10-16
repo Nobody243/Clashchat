@@ -7,7 +7,7 @@ import '../ui/ui.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  static const String _version = '1.1.0';
+  static const String _version = '1.1.1';
 
   static const List<ThemeMode> _modes = [
     ThemeMode.system,

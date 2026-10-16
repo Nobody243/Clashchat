@@ -135,7 +135,7 @@ class _StanceScreenState extends State<StanceScreen> {
       Text(widget.topic, style: context.text.headlineMedium),
       const SizedBox(height: AppSpacing.sm),
       Text(
-        'Pick a side. ClashBot takes the other.',
+        'Which side will you argue? ClashBot argues the opposite.',
         style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
       ),
       const SizedBox(height: AppSpacing.xxl),
@@ -144,7 +144,7 @@ class _StanceScreenState extends State<StanceScreen> {
           Expanded(
             child: _SideButton(
               label: 'For',
-              caption: 'I agree',
+              caption: 'I agree with it',
               positive: true,
               selected: _isFor,
               onTap: () => _select(true),
@@ -154,7 +154,7 @@ class _StanceScreenState extends State<StanceScreen> {
           Expanded(
             child: _SideButton(
               label: 'Against',
-              caption: 'I disagree',
+              caption: 'I disagree with it',
               positive: false,
               selected: !_isFor,
               onTap: () => _select(false),

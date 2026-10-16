@@ -101,15 +101,18 @@ class _HomeBodyState extends State<_HomeBody> {
     final mode = _mode;
     final Widget next = switch (mode) {
       DebateMode.learning => ChatScreen(
-          topic: topic,
-          stance: stance,
-          difficulty: 'Adaptable', // Default for Learning Mode
-          timerMinutes: null, // No timer for learning
-          mode: mode,
-        ),
+        topic: topic,
+        stance: stance,
+        difficulty: 'Adaptable', // Default for Learning Mode
+        timerMinutes: null, // No timer for learning
+        mode: mode,
+      ),
       DebateMode.ranked => RankedSetupScreen(topic: topic, stance: stance),
-      DebateMode.casual =>
-        DebateSetupScreen(topic: topic, stance: stance, mode: mode),
+      DebateMode.casual => DebateSetupScreen(
+        topic: topic,
+        stance: stance,
+        mode: mode,
+      ),
     };
     Navigator.push(context, MaterialPageRoute(builder: (_) => next));
   }
@@ -129,8 +132,9 @@ class _HomeBodyState extends State<_HomeBody> {
           pointsEarned: record.pointsEarned,
           mode: record.mode,
           isFromHistory: true,
-          durationMinutes:
-              record.durationMinutes > 0 ? record.durationMinutes : null,
+          durationMinutes: record.durationMinutes > 0
+              ? record.durationMinutes
+              : null,
         ),
       ),
     );
@@ -171,18 +175,23 @@ class _HomeBodyState extends State<_HomeBody> {
         AppSpacing.xxxl + bottomInset,
       ),
       child: StreamBuilder<DocumentSnapshot>(
-        stream:
-            FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots(),
         builder: (context, snapshot) {
           final loading =
               snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData;
+              !snapshot.hasData;
           if (loading) {
-            return compact ? const _PhoneSkeleton() : const _DashboardSkeleton();
+            return compact
+                ? const _PhoneSkeleton()
+                : const _DashboardSkeleton();
           }
 
           final data = snapshot.data?.data() as Map<String, dynamic>?;
-          final displayName = data?['displayName'] as String? ??
+          final displayName =
+              data?['displayName'] as String? ??
               AuthService.currentUser?.displayName ??
               'Debater';
           final avatarSeed = data?['avatarSeed'] as String? ?? 'Felix';
@@ -195,12 +204,12 @@ class _HomeBodyState extends State<_HomeBody> {
             stream: uid == null
                 ? null
                 : FirebaseFirestore.instance
-                    .collection('debates')
-                    .doc(uid)
-                    .collection('history')
-                    .orderBy('date', descending: true)
-                    .limit(3)
-                    .snapshots(),
+                      .collection('debates')
+                      .doc(uid)
+                      .collection('history')
+                      .orderBy('date', descending: true)
+                      .limit(3)
+                      .snapshots(),
             builder: (context, recentSnap) {
               final recent = (recentSnap.data?.docs ?? const [])
                   .map(DebateRecord.fromFirestore)
@@ -279,7 +288,7 @@ class _HomeBodyState extends State<_HomeBody> {
 /// Phones: a quiet top line, today's motion as the hero with a split
 /// For / Against choice, text tabs for the mode, and recent debates as plain
 /// rows. No cards, no icon tiles, one action.
-class _PhoneHome extends StatelessWidget {
+class _PhoneHome extends StatefulWidget {
   final String displayName;
   final String avatarSeed;
   final DebateRank rank;
@@ -312,134 +321,14 @@ class _PhoneHome extends StatelessWidget {
     required this.onSeeAll,
   });
 
-  static String _describe(DebateMode mode) => switch (mode) {
-        DebateMode.casual =>
-          "Custom timer, pick the opponent's strength. Nothing at stake.",
-        DebateMode.ranked =>
-          'Timed match, opponent set by your rank. Points on the line.',
-        DebateMode.learning =>
-          'Untimed. A coaching tip after every message you send.',
-      };
-
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final locked = quota.isLocked;
-
-    return StaggeredColumn(
-      children: [
-        _TopLine(
-          displayName: displayName,
-          avatarSeed: avatarSeed,
-          rank: rank,
-          rankColor: rankColor,
-          points: points,
-          quota: quota,
-          onTapAvatar: onTapAvatar,
-        ),
-        AppSpacing.vXxxl,
-        const AppSectionLabel(
-          "Today's motion",
-          padding: EdgeInsets.only(bottom: AppSpacing.sm),
-        ),
-        Text(
-          Motions.forDay(),
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: context.text.headlineMedium?.copyWith(height: 1.12),
-        ),
-        AppSpacing.vMd,
-        Text(
-          'Pick a side. ClashBot takes the other.',
-          style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
-        ),
-        AppSpacing.vXl,
-        Row(
-          children: [
-            Expanded(
-              child: _SideButton(
-                label: 'For',
-                caption: 'I agree',
-                color: c.positiveText,
-                enabled: !locked,
-                onTap: () => onPickSide('For'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _SideButton(
-                label: 'Against',
-                caption: 'I disagree',
-                color: c.negativeText,
-                enabled: !locked,
-                onTap: () => onPickSide('Against'),
-              ),
-            ),
-          ],
-        ),
-        if (locked) ...[
-          AppSpacing.vSm,
-          Text(
-            'Daily limit reached',
-            textAlign: TextAlign.center,
-            style: context.text.labelSmall?.copyWith(color: c.textHint),
-          ),
-        ],
-        AppSpacing.vLg,
-        Pressable(
-          onTap: onWriteOwn,
-          pressedScale: 0.98,
-          semanticLabel: 'Write your own motion',
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Text(
-              'Or write your own motion →',
-              style: context.text.labelLarge?.copyWith(color: c.accent),
-            ),
-          ),
-        ),
-        AppSpacing.vXxxl,
-        AppTextTabs(
-          labels: const ['Casual', 'Ranked', 'Learning'],
-          index: DebateMode.values.indexOf(mode),
-          onChanged: (i) => onModeChanged(DebateMode.values[i]),
-        ),
-        AppSpacing.vMd,
-        Text(
-          _describe(mode),
-          style: context.text.bodySmall?.copyWith(color: c.textSecondary),
-        ),
-        if (recent.isNotEmpty) ...[
-          AppSectionLabel(
-            'Recent',
-            actionLabel: 'See all',
-            onAction: onSeeAll,
-          ),
-          AppRows(
-            children: [
-              for (final r in recent.take(3))
-                AppPlainRow(
-                  title: r.topic,
-                  subtitle: _recentSubtitle(r),
-                  leading: ScoreNumber(r.score),
-                  trailing: Text(
-                    _when(r.date),
-                    style: context.mono(size: 11, color: c.textHint),
-                  ),
-                  onTap: () => onOpenRecord(r),
-                ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
+  State<_PhoneHome> createState() => _PhoneHomeState();
 
   static String _modeName(DebateMode mode) => switch (mode) {
-        DebateMode.casual => 'Casual',
-        DebateMode.ranked => 'Ranked',
-        DebateMode.learning => 'Learning',
-      };
+    DebateMode.casual => 'Casual',
+    DebateMode.ranked => 'Ranked',
+    DebateMode.learning => 'Learning',
+  };
 
   static String _recentSubtitle(DebateRecord r) {
     final base = '${r.stance} · ${_modeName(r.mode)}';
@@ -459,6 +348,157 @@ class _PhoneHome extends StatelessWidget {
     if (days == 1) return 'Yesterday';
     if (days < 7) return DateFormat.E().format(date);
     return DateFormat('MMM d').format(date);
+  }
+}
+
+class _PhoneHomeState extends State<_PhoneHome> {
+  /// 'For' | 'Against' | null. Choosing a side does not start anything;
+  /// the Start button does, so a new user always sees mode -> side -> start.
+  String? _side;
+
+  static String _describe(DebateMode mode) => switch (mode) {
+    DebateMode.casual =>
+      "Practice. You set the clock and the opponent's strength. Nothing at stake.",
+    DebateMode.ranked =>
+      'Compete. Timed match against an opponent set by your rank. Points on the line.',
+    DebateMode.learning =>
+      'Learn. No clock, and a coaching tip after every message you send.',
+  };
+
+  static String _cta(DebateMode mode) => switch (mode) {
+    DebateMode.casual => 'Start casual debate',
+    DebateMode.ranked => 'Start ranked debate',
+    DebateMode.learning => 'Start learning session',
+  };
+
+  String _hint(bool locked) {
+    if (locked) return 'Daily limit reached. Resets tomorrow.';
+    if (_side == null) return 'Pick For or Against to begin.';
+    final other = _side == 'For' ? 'against' : 'for';
+    return 'You argue ${_side!.toLowerCase()}. ClashBot argues $other.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final w = widget;
+    final locked = w.quota.isLocked;
+    final canStart = !locked && _side != null;
+
+    return StaggeredColumn(
+      children: [
+        _TopLine(
+          displayName: w.displayName,
+          avatarSeed: w.avatarSeed,
+          rank: w.rank,
+          rankColor: w.rankColor,
+          points: w.points,
+          quota: w.quota,
+          onTapAvatar: w.onTapAvatar,
+        ),
+        AppSpacing.vXxxl,
+
+        // 1 · Mode first: it decides what Start does.
+        const AppSectionLabel(
+          '1 · Choose a mode',
+          padding: EdgeInsets.only(bottom: AppSpacing.sm),
+        ),
+        AppTextTabs(
+          labels: const ['Casual', 'Ranked', 'Learning'],
+          index: DebateMode.values.indexOf(w.mode),
+          onChanged: (i) => w.onModeChanged(DebateMode.values[i]),
+        ),
+        AppSpacing.vMd,
+        Text(
+          _describe(w.mode),
+          style: context.text.bodySmall?.copyWith(color: c.textSecondary),
+        ),
+        AppSpacing.vXxxl,
+
+        // 2 · The topic and which side you argue.
+        AppSectionLabel(
+          "2 · Today's topic",
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          actionLabel: 'Change topic',
+          onAction: w.onWriteOwn,
+        ),
+        Text(
+          Motions.forDay(),
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: context.text.headlineMedium?.copyWith(height: 1.12),
+        ),
+        AppSpacing.vMd,
+        Text(
+          'Which side will you argue? ClashBot argues the opposite.',
+          style: context.text.bodyMedium?.copyWith(color: c.textSecondary),
+        ),
+        AppSpacing.vLg,
+        Row(
+          children: [
+            Expanded(
+              child: _SideButton(
+                label: 'For',
+                caption: 'I agree with it',
+                color: c.positiveText,
+                tint: c.positiveBg,
+                selected: _side == 'For',
+                enabled: !locked,
+                onTap: () => setState(() => _side = 'For'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SideButton(
+                label: 'Against',
+                caption: 'I disagree with it',
+                color: c.negativeText,
+                tint: c.negativeBg,
+                selected: _side == 'Against',
+                enabled: !locked,
+                onTap: () => setState(() => _side = 'Against'),
+              ),
+            ),
+          ],
+        ),
+        AppSpacing.vXl,
+
+        // 3 · One obvious action.
+        AppButton.primary(
+          label: _cta(w.mode),
+          icon: AppIcons.play,
+          onPressed: canStart ? () => w.onPickSide(_side!) : null,
+        ),
+        AppSpacing.vSm,
+        Text(
+          _hint(locked),
+          textAlign: TextAlign.center,
+          style: context.text.labelSmall?.copyWith(color: c.textHint),
+        ),
+        if (w.recent.isNotEmpty) ...[
+          AppSectionLabel(
+            'Recent',
+            actionLabel: 'See all',
+            onAction: w.onSeeAll,
+          ),
+          AppRows(
+            children: [
+              for (final r in w.recent.take(3))
+                AppPlainRow(
+                  title: r.topic,
+                  subtitle: _PhoneHome._recentSubtitle(r),
+                  leading: ScoreNumber(r.score),
+                  trailing: Text(
+                    _PhoneHome._when(r.date),
+                    style: context.mono(size: 11, color: c.textHint),
+                  ),
+                  onTap: () => w.onOpenRecord(r),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
   }
 }
 
@@ -485,8 +525,8 @@ class _TopLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final rankName =
-        (RankModel.rankData[rank]!['name'] as String).toUpperCase();
+    final rankName = (RankModel.rankData[rank]!['name'] as String)
+        .toUpperCase();
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -550,6 +590,8 @@ class _SideButton extends StatelessWidget {
   final String label;
   final String caption;
   final Color color;
+  final Color tint;
+  final bool selected;
   final bool enabled;
   final VoidCallback onTap;
 
@@ -557,6 +599,8 @@ class _SideButton extends StatelessWidget {
     required this.label,
     required this.caption,
     required this.color,
+    required this.tint,
+    required this.selected,
     required this.enabled,
     required this.onTap,
   });
@@ -571,12 +615,17 @@ class _SideButton extends StatelessWidget {
       enabled: enabled,
       pressedScale: 0.96,
       semanticLabel: '$label: $caption',
-      child: Container(
-        height: 64,
+      child: AnimatedContainer(
+        duration: AppDurations.fast,
+        curve: Curves.easeOutCubic,
+        height: 68,
         decoration: BoxDecoration(
-          color: c.surface,
+          color: selected ? tint : c.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: c.borderStrong),
+          border: Border.all(
+            color: selected ? fg : c.borderStrong,
+            width: selected ? 1.5 : 1,
+          ),
         ),
         alignment: Alignment.center,
         child: Column(
@@ -609,26 +658,26 @@ class _PhoneSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget row() => Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-          child: Row(
-            children: [
-              const AppSkeleton.line(width: 28, height: 14),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    AppSkeleton.line(width: 200, height: 14),
-                    SizedBox(height: AppSpacing.sm),
-                    AppSkeleton.line(width: 110, height: 11),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              const AppSkeleton.line(width: 52, height: 11),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+      child: Row(
+        children: [
+          const AppSkeleton.line(width: 28, height: 14),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                AppSkeleton.line(width: 200, height: 14),
+                SizedBox(height: AppSpacing.sm),
+                AppSkeleton.line(width: 110, height: 11),
+              ],
+            ),
           ),
-        );
+          const SizedBox(width: AppSpacing.md),
+          const AppSkeleton.line(width: 52, height: 11),
+        ],
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -716,16 +765,8 @@ class _Dashboard extends StatelessWidget {
           collapseBelow: _kCollapseBelow,
           rows: [
             [
-              BentoTile(
-                flex: 2,
-                priority: 0,
-                child: _RankHero(points: points),
-              ),
-              BentoTile(
-                flex: 1,
-                priority: 1,
-                child: _UsageCard(quota: quota),
-              ),
+              BentoTile(flex: 2, priority: 0, child: _RankHero(points: points)),
+              BentoTile(flex: 1, priority: 1, child: _UsageCard(quota: quota)),
             ],
             if (collapsed)
               [
@@ -902,8 +943,9 @@ class _RankHero extends StatelessWidget {
                     AppSpacing.hSm,
                     Text(
                       'pts',
-                      style: context.text.labelLarge
-                          ?.copyWith(color: c.textSecondary),
+                      style: context.text.labelLarge?.copyWith(
+                        color: c.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -915,8 +957,9 @@ class _RankHero extends StatelessWidget {
                 AppSpacing.vSm,
                 Text(
                   _nextRankLabel(rank),
-                  style:
-                      context.text.labelSmall?.copyWith(color: c.textSecondary),
+                  style: context.text.labelSmall?.copyWith(
+                    color: c.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -967,8 +1010,9 @@ class _UsageCard extends StatelessWidget {
               AppSpacing.hSm,
               Text(
                 'of ${quota.dailyLimit} debates',
-                style:
-                    context.text.labelMedium?.copyWith(color: c.textSecondary),
+                style: context.text.labelMedium?.copyWith(
+                  color: c.textSecondary,
+                ),
               ),
             ],
           ),
@@ -995,19 +1039,19 @@ class _UsageCard extends StatelessWidget {
 // ── Modes ────────────────────────────────────────────────────────────────────
 
 ({String title, String subtitle}) _modeCopy(DebateMode mode) => switch (mode) {
-      DebateMode.casual => (
-          title: 'Casual',
-          subtitle: 'Custom timers and difficulty, no points at risk',
-        ),
-      DebateMode.ranked => (
-          title: 'Ranked',
-          subtitle: 'Quick 5 min or a full match, difficulty set by your rank',
-        ),
-      DebateMode.learning => (
-          title: 'Learning',
-          subtitle: 'Real-time coaching, tips and feedback',
-        ),
-    };
+  DebateMode.casual => (
+    title: 'Casual',
+    subtitle: 'Custom timers and difficulty, no points at risk',
+  ),
+  DebateMode.ranked => (
+    title: 'Ranked',
+    subtitle: 'Quick 5 min or a full match, difficulty set by your rank',
+  ),
+  DebateMode.learning => (
+    title: 'Learning',
+    subtitle: 'Real-time coaching, tips and feedback',
+  ),
+};
 
 (Color fg, Color bg) _modeTint(BuildContext context, DebateMode mode) {
   final c = context.colors;
@@ -1216,7 +1260,11 @@ class _TipCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AppIconTile(icon: AppIcons.coachTip, size: 40, iconSize: 20),
+              const AppIconTile(
+                icon: AppIcons.coachTip,
+                size: 40,
+                iconSize: 20,
+              ),
               AppSpacing.hMd,
               Expanded(
                 child: Text('Tip of the day', style: context.text.titleSmall),
@@ -1270,9 +1318,7 @@ class _DashboardSkeleton extends StatelessWidget {
               BentoTile(flex: 2, child: block(196)),
               BentoTile(flex: 1, child: block(196)),
             ],
-            [
-              for (var i = 0; i < 3; i++) BentoTile(child: block(96)),
-            ],
+            [for (var i = 0; i < 3; i++) BentoTile(child: block(96))],
             [
               BentoTile(flex: 2, child: block(200)),
               BentoTile(flex: 1, child: block(200)),
