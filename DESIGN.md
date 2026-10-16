@@ -4,36 +4,62 @@ Single source of truth for how ClashChat looks and moves. Code lives in `lib/cor
 
 ## 1. Visual Theme & Atmosphere
 
-A debate arena after hours. Violet-black surfaces with real tonal steps, one luminous gold accent used like a trophy, lit by soft gold, violet and ember stage lights, and typography that does the talking. Density is "daily app balanced" (5/10): generous padding, never cramped, never empty. Variance is moderate (5/10): left-aligned headers, asymmetric hero on Home, strict single column on phones. Motion is fluid but short (5/10): things settle in under 260 ms, nothing loops except the timer under one minute and the typing indicator.
+A debate chamber: ink and paper, one flame. Surfaces are true neutrals, type does the talking, and a single vermilion accent marks the one thing you can act on. Proportions follow 80 / 15 / 5: canvas 80 %, surfaces + hairlines + muted text 15 %, accent 5 %, and typography that does the talking. Density is "daily app balanced" (5/10): generous padding, never cramped, never empty. Variance is moderate (5/10): left-aligned headers, asymmetric hero on Home, strict single column on phones. Motion is fluid but short (5/10): things settle in under 260 ms, nothing loops except the timer under one minute and the typing indicator.
 
-What it is not: a neon purple AI app. No glows, no gradient buttons, no emoji as icons, no spinning robots.
+What it is not: a neon AI app or a casino. No glows, no gradient buttons, no emoji as icons, no gold on buttons (gold means rank, never action).
 
 ## 2. Color Palette & Roles
 
 Two themes, one personality. Dark is the default.
 
-### Dark ("Arena Night")
-- **Canvas** `#0D0B12` — scaffold background. Violet-black, never pure black.
-- **Surface** `#17141D` — cards, sheets. **Surface Raised** `#211D2A` — nested panels, AI bubbles, inputs. **Inset** `#07060A` — recessed wells.
-- Cards carry a 5 % top-light so they read as lit objects, not flat rectangles.
-- **Ink** `#F5F1EA` primary text. **Ink Muted** `#B8B1AA`. **Ink Hint** `#857E88` (4.5:1 on canvas).
-- **Hairline** `#2C2736`, **Hairline Strong** `#3E3749` — visible, not ghostly.
-- **Gold** `#F0B94B` — the accent. Text on gold is `#1C1406`. **Gold Soft** gold @ 16 %.
-- **Sage** `#5BD29B` on `#123A2E` — For, strengths, success, Easy.
-- **Ember** `#FF8A6A` on `#432119` — Against, weaknesses, errors, Hard.
-- **Amber** `#F5C76A` on `#3F2E10` — warnings, Medium, ranked points.
-- **Sky** `#7FB4FF` on `#172A47` — info, Learning.
-- **Violet** `#7C5CFF` — ambience only (backdrop light), never chrome.
+### Dark ("Ink")
+- **Canvas** `#0E0E10` (80 % of every screen). **Surface** `#161618`, **Raised** `#1E1E21`, **Inset** `#09090A` — the 15 %, with hairlines `#28282C` / `#38383E`.
+- **Ink** `#F4F2EE` primary text, **Muted** `#ADAAA6`, **Hint** `#88857F`.
+- **Flame** `#FF5A3C` — the 5 %. Primary button (text `#1A0A06`), selected nav, progress, the live timer, "Chat" in the wordmark. Soft tint = flame @ 14 %.
+- **Sage** `#4ED39A` on `#10342A` — For, strengths, success, Easy.
+- **Ember** `#FF7B6B` on `#3D1D1D` — Against, weaknesses, errors, Hard.
+- **Amber** `#E0B35C` on `#3A2B10` — warnings, Medium.
+- **Sky** `#6FB1FF` on `#132A45` — info, Learning.
+- **Gold** `#D9A441` on `#3A2B10` — rank and ranked points only.
 
-### Light ("Arena Day")
-- **Canvas** `#F7F4EE` (warm paper), **Surface** `#FFFFFF`, **Inset** `#ECE7DE`.
-- **Ink** `#171320`, **Ink Muted** `#5B5566`, **Ink Hint** `#7A7484`.
-- **Hairline** `#E3DDD2`, **Hairline Strong** `#CFC7BA`.
-- **Gold** darkens to `#B47F1E` for text and icons. Primary buttons are **Ink** with paper text.
-- Sage `#1F7A55` on `#DDF3E8`, Ember `#B8442B` on `#FBE3DD`, Amber `#946011` on `#FBEFD5`, Sky `#2F62B5` on `#E1EAF9`.
+### Light ("Paper")
+- **Canvas** `#F7F5F0` (warm paper), **Surface** `#FFFFFF`, **Inset** `#ECE9E2`, hairlines `#E3E0D8` / `#CFCBC1`.
+- **Ink** `#141317`, **Muted** `#5A5860`, **Hint** `#6B6874`.
+- **Flame** darkens to `#C93217`. Primary buttons are **Ink** with paper text; flame marks selection and progress.
+- Sage `#1E7B55` on `#DDF1E6`, Ember `#C4381E` on `#FBE2DB`, Amber `#8A6A1C` on `#F6EBCF`, Sky `#2F5FB3` on `#E1E9F8`, Gold `#8A6A1C` on `#F6EBCF`.
+
+### Contrast (WCAG 2.x, computed)
+| Theme | Pair | Colors | Ratio |
+|---|---|---|---|
+| Dark | text | `#F4F2EE` on `#0E0E10` | 17.2:1 |
+| Dark | mute | `#ADAAA6` on `#0E0E10` | 8.3:1 |
+| Dark | hint | `#88857F` on `#0E0E10` | 5.2:1 |
+| Dark | accent | `#FF5A3C` on `#0E0E10` | 6.2:1 |
+| Dark | pos | `#4ED39A` on `#0E0E10` | 10.2:1 |
+| Dark | neg | `#FF7B6B` on `#0E0E10` | 7.6:1 |
+| Dark | warn | `#E0B35C` on `#0E0E10` | 9.9:1 |
+| Dark | info | `#6FB1FF` on `#0E0E10` | 8.6:1 |
+| Dark | rank | `#D9A441` on `#0E0E10` | 8.6:1 |
+| Dark | text on surface | `#F4F2EE` on `#161618` | 16.2:1 |
+| Dark | hint on surface | `#88857F` on `#161618` | 4.9:1 |
+| Light | text | `#141317` on `#F7F5F0` | 17.0:1 |
+| Light | mute | `#5A5860` on `#F7F5F0` | 6.4:1 |
+| Light | hint | `#6B6874` on `#F7F5F0` | 5.0:1 |
+| Light | accent | `#C93217` on `#F7F5F0` | 4.9:1 |
+| Light | pos | `#1E7B55` on `#F7F5F0` | 4.8:1 |
+| Light | neg | `#C4381E` on `#F7F5F0` | 4.9:1 |
+| Light | warn | `#8A6A1C` on `#F7F5F0` | 4.6:1 |
+| Light | info | `#2F5FB3` on `#F7F5F0` | 5.7:1 |
+| Light | rank | `#8A6A1C` on `#F7F5F0` | 4.6:1 |
+| Light | text on surface | `#141317` on `#FFFFFF` | 18.5:1 |
+| Light | hint on surface | `#6B6874` on `#FFFFFF` | 5.4:1 |
+| Dark | CTA label on accent | `#1A0A06` on `#FF5A3C` | 6.2:1 |
+| Light | CTA label on ink | `#F7F5F0` on `#141317` | 17.0:1 |
+
+All text pairs clear 4.5:1; large display numbers and icons clear 3:1 with margin. Re-run the check whenever a token changes.
 
 ### Rank colors (both themes)
-Newcomer stone `#9A958F`, Challenger bronze `#C98A4B`, Debater silver `#B9C2CC`, Orator gold `#F0B94B`, Grandmaster ice `#D7ECFA`. Ranks are drawn with Lucide icons, never emoji.
+Newcomer stone `#9A9794`, Challenger bronze `#C08552`, Debater silver `#B7BEC7`, Orator gold `#D9A441`, Grandmaster platinum `#DCE9F5`. Ranks are drawn with Lucide icons, never emoji.
 
 ## 3. Typography Rules
 
@@ -82,7 +108,7 @@ Lucide icons via `lucide_icons_flutter`. The regular stroke is the default; the 
 
 The first pass set tokens and structure. This layer is what makes it feel made.
 
-- **Backdrop** (`AppBackdrop`): every page sits on the canvas plus four slow "stage lights" (gold 22 %, violet 16 %, ember 10 %, sky 7 %, drifting over ~22 s) and a fine film grain (4.5 % white in dark, 3.5 % black in light). Never a visible blob, never neon: at arm's length it reads as a lit room, not a gradient.
+- **Backdrop** (`AppBackdrop`): every page sits on the canvas plus two faint "stage lights" (flame 8.5 % top-left, sky 4.5 % right, drifting over ~22 s) and a fine film grain (4.5 % white in dark, 3.5 % black in light). Never a visible blob, never neon: at arm's length it reads as a lit room, not a gradient.
 - **Glass** (`GlassCard`, `GlassBar`): blur 16–18, fill 72 % (dark) / 80 % (light), hairline, 1 px top highlight. Used for the login card on desktop, floating headers over scrolling content, the scoring overlay and bottom sheets. Not for ordinary cards.
 - **Numbers move** (`AnimatedNumber`): points, scores and counts count up in the mono face on first appearance.
 - **Big moments** (`ParticleBurst`): a short fall of brass/sage/sky flecks for a score of 70+ or positive ranked points. Once, never looping.

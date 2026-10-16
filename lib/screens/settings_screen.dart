@@ -45,7 +45,7 @@ class SettingsScreen extends StatelessWidget {
                 Text('Theme', style: context.text.titleSmall),
                 AppSpacing.vXs,
                 Text(
-                  'System follows your device. Arena Night is the default.',
+                  'System follows your device. Ink is the default.',
                   style: context.text.bodySmall,
                 ),
                 AppSpacing.vLg,

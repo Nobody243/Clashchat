@@ -14,7 +14,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="ClashChat – sharpen your arguments in live debates against an AI opponent. Casual, ranked and coached modes.">
-  <meta name="theme-color" content="#0D0B12">
+  <meta name="theme-color" content="#0E0E10">
   <meta name="color-scheme" content="dark light">
 
   <!-- iOS meta tags & icons -->
@@ -32,11 +32,11 @@
 
   <style>
     /* Branded loading state shown until Flutter paints its first frame. */
-    html, body { height: 100%; margin: 0; background: #0D0B12; }
+    html, body { height: 100%; margin: 0; background: #0E0E10; }
     #cc-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 18px;
-      background: #0D0B12; color: #F5F1EA;
+      background: #0E0E10; color: #F4F2EE;
       font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
       transition: opacity 320ms ease-out; z-index: 9999;
     }
@@ -45,13 +45,13 @@
     #cc-loader .mark .b1, #cc-loader .mark .b2 {
       position: absolute; border-radius: 10px;
     }
-    #cc-loader .mark .b1 { left: 6px; top: 10px; width: 30px; height: 22px; border: 3px solid #F5F1EA; }
-    #cc-loader .mark .b2 { left: 22px; top: 24px; width: 28px; height: 20px; background: #F0B94B;
-      box-shadow: 0 0 0 3px #0D0B12; }
+    #cc-loader .mark .b1 { left: 6px; top: 10px; width: 30px; height: 22px; border: 3px solid #F4F2EE; }
+    #cc-loader .mark .b2 { left: 22px; top: 24px; width: 28px; height: 20px; background: #FF5A3C;
+      box-shadow: 0 0 0 3px #0E0E10; }
     #cc-loader .word { font-size: 24px; font-weight: 600; letter-spacing: -0.4px; }
-    #cc-loader .word span { color: #F0B94B; }
-    #cc-loader .bar { width: 64px; height: 2px; background: #2C2736; overflow: hidden; border-radius: 2px; }
-    #cc-loader .bar i { display: block; height: 100%; width: 40%; background: #F0B94B;
+    #cc-loader .word span { color: #FF5A3C; }
+    #cc-loader .bar { width: 64px; height: 2px; background: #28282C; overflow: hidden; border-radius: 2px; }
+    #cc-loader .bar i { display: block; height: 100%; width: 40%; background: #FF5A3C;
       animation: cc-slide 1.2s ease-in-out infinite; }
     @keyframes cc-slide { 0% { transform: translateX(-100%);} 100% { transform: translateX(260%);} }
     @media (prefers-reduced-motion: reduce) { #cc-loader .bar i { animation: none; width: 100%; } }

@@ -539,7 +539,7 @@ class _UsageCard extends StatelessWidget {
         ),
       DebateMode.ranked => (
           title: 'Ranked',
-          subtitle: '10 minutes, difficulty matched to your rank',
+          subtitle: 'Quick 5 min or a full match, difficulty set by your rank',
         ),
       DebateMode.learning => (
           title: 'Learning',

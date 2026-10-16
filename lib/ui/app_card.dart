@@ -75,7 +75,7 @@ class AppCard extends StatelessWidget {
               ? LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color.lerp(bg, Colors.white, 0.055)!, bg],
+                  colors: [Color.lerp(bg, Colors.white, 0.035)!, bg],
                   stops: const [0.0, 0.55],
                 )
               : null,
